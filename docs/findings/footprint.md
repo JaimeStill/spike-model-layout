@@ -335,23 +335,26 @@ which returned the pool to 20.68 GiB before L3 and L4, the cells that measure th
 
 **On the Framework the same cache sits outside GTT.** L2 ran to its end there: GTT used rose only
 92.97 → 93.61 GiB, while the 26B-A4B's RSS grew 239 → 9867 MiB. The prompt cache is ordinary
-system memory, which the GTT watch can't see. The session read `free -m` on the Framework beside
-each cell from P2a on; the last column is `available`, in MiB, of a 128,075 MiB total:
+system memory, which the GTT watch can't see. The session read `free` on the Framework after each
+cell from P1 on: `free -g` after P1, `free -m` from P2a on; no read was taken at set A idle before
+P1. The figures are from `.state/footprint/framework-free.txt`, the raw output (untracked, like the
+step logs). The full line is `Mem:` total, used, free, shared, buff/cache and available; the
+table's second column is `available`, in MiB, of a 128,075 MiB total:
 
-| After | available (MiB) | Full line where read |
+| After | available (MiB) | Full line |
 | --- | --- | --- |
 | P1 (`free -g`) | 23 GiB | `125 102 3 0 25 23` |
 | P2a | 22576 | `128075 105499 3569 29 24598 22576` |
-| P2b | 22466 | |
-| P2c | 21340 | |
-| P3a | 21223 | |
-| P3b | 21018 | |
-| P4 | 20900 | |
-| fresh set A, idle before L1 | 23965 | |
-| L1 | 23639 | |
+| P2b | 22466 | `128075 105608 3459 29 24598 22466` |
+| P2c | 21340 | `128075 106735 3371 29 23559 21340` |
+| P3a | 21223 | `128075 106852 3254 29 23559 21223` |
+| P3b | 21018 | `128075 107057 4065 29 22543 21018` |
+| P4 | 20900 | `128075 107175 3947 29 22543 20900` |
+| fresh set A, idle before L1 | 23965 | `128075 104110 3680 29 25873 23965` |
+| L1 | 23639 | `128075 104436 3699 29 25528 23639` |
 | L2 | 13660 | `128075 114415 3404 28 15844 13660` |
-| L3 | 12789 | |
-| L4 | 12658 | |
+| L3 | 12789 | `128075 115286 2532 28 15844 12789` |
+| L4 | 12658 | `128075 115417 6334 25 11899 12658` |
 | final fresh set A | 23829 | `128075 104245 5030 19 24367 23829` |
 
 So the Framework's system memory available fell 23,639 → 13,660 MiB through L2 and to 12,658 MiB
@@ -363,9 +366,10 @@ it as `ValueError('Streaming response returned an error: The model produced outp
 match the expected peg-gemma4 format')`; the router log from 21:22:10Z held no matching error line.
 Recorded, not rerun.
 
-**Each process's highest figure under load** (reads after L1-L4), against its warmed peak:
+**Each process's highest figure under load, read after the cell** (the reads after L1-L4; no
+process figure is read during a cell), against its warmed peak:
 
-| Model | gb10-1 GPU / RSS (MiB) | over warmed peak | Framework GTT / RSS (MiB) | over warmed peak |
+| Model | gb10-1 GPU / RSS after the cell (MiB) | over warmed peak | Framework GTT / RSS after the cell (MiB) | over warmed peak |
 | --- | --- | --- | --- | --- |
 | gpt-oss set-a | 65015 / 1572 (after L1) | 0 / +33 | 65507 / 269 (after L1) | −179 / +11 |
 | 26B-A4B | 18828 / 10397 (after L2, stopped) | 0 / +7044 | 19042 / 9867 (after L2) | −20 / +7855 |
@@ -376,7 +380,7 @@ L1-L4 started from a fresh reload, so a figure under the warmed peak is a model 
 than P1-P4 did. The E4B's RSS growth under L3 is its prompt cache too (34 prompt saves on gb10-1, 32
 on the Framework).
 
-**The pool's lowest** (watch): gb10-1 L1 21.03, L2 10.39 (stopped), L3 19.57, L4 19.35 GiB; the
+**The pool's lowest during the cell** (watch, every 10 s): gb10-1 L1 21.03, L2 10.39 (stopped), L3 19.57, L4 19.35 GiB; the
 Framework L1 19.03, L2 18.39, L3 18.33, L4 18.31 GiB (GTT). Over the warmed peak: gb10-1 −6.84 GiB
 (17.23 → 10.39, all of it L2's prompt cache); the Framework's GTT stayed above its warmed peak
 (18.08), since L1-L4 began from a fresh reload.
@@ -401,6 +405,72 @@ log's buffer lines match gb10-1's line for line for every section**: the weight,
 with the same cells, layers and seqs), compute, projector and output figures in section C's table,
 and the same `n_slots` and `n_ctx_slot`. The projector estimates differ only in the time they took.
 So gb10-1's rows stand for a GB10, as the hosts finding's parity did for speed.
+
+The lines, as the `footprint 2026-11-09T00:00:00Z` read printed them
+(`.state/measure/gb10-2/2026-11-09.log`, 16:08:49 local). The read prints every load line since
+midnight UTC, so it also printed the day's eight earlier loads (granite, E4B, 26B-A4B and gpt-oss
+set-a once each, then gpt-oss set-a four more times at 11:49-12:04 local, the hosts task's); quoted
+here are only the four spawns of the current load (12:07:14-12:07:42 local) and every line after
+them, in log order. As in the hosts finding's quotes of helper output, each line's step-log prefix
+(`= 2026-11-09T16:08:49-05:00 footprint: `) is left out; nothing else is trimmed, the `took N ms`
+of the projector estimates included:
+
+```
+  router: srv load: spawning server instance with name=mrutkows/granite-embedding-english-r2-GGUF:BF16 on port 46569
+  mrutkows/granite-embedding-english-r2-GGUF:BF16: load_tensors: CUDA0 model buffer size = 210.51 MiB
+  mrutkows/granite-embedding-english-r2-GGUF:BF16: load_tensors: CUDA_Host model buffer size = 73.78 MiB
+  mrutkows/granite-embedding-english-r2-GGUF:BF16: llama_context: CUDA_Host output buffer size = 3.12 MiB
+  mrutkows/granite-embedding-english-r2-GGUF:BF16: sched_reserve: CUDA0 compute buffer size = 460.13 MiB
+  mrutkows/granite-embedding-english-r2-GGUF:BF16: sched_reserve: CUDA_Host compute buffer size = 352.19 MiB
+  mrutkows/granite-embedding-english-r2-GGUF:BF16: srv load_model: initializing, n_slots = 16, n_ctx_slot = 8192, kv_unified = 'false'
+  router: srv load: spawning server instance with name=ggml-org/gemma-4-E4B-it-GGUF:Q8_0 on port 35083
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: srv load_model: [mtmd] estimated worst-case memory usage of mmproj is 746.89 MiB (took 55.75 ms)
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: load_tensors: CUDA0 model buffer size = 4788.12 MiB
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: load_tensors: CUDA_Host model buffer size = 3536.00 MiB
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: llama_context: CUDA_Host output buffer size = 4.00 MiB
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: llama_kv_cache: CUDA0 KV buffer size = 512.00 MiB
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: llama_kv_cache: size = 512.00 MiB ( 8192 cells, 4 layers, 4/4 seqs), K (f16): 256.00 MiB, V (f16): 256.00 MiB
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: llama_kv_cache: CUDA0 KV buffer size = 160.00 MiB
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: llama_kv_cache: size = 160.00 MiB ( 1024 cells, 20 layers, 4/4 seqs), K (f16): 80.00 MiB, V (f16): 80.00 MiB
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: sched_reserve: CUDA0 compute buffer size = 137.02 MiB
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: sched_reserve: CUDA_Host compute buffer size = 50.03 MiB
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: load_hparams: projector: gemma4v
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: load_hparams: model size: 533.83 MiB
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: reserve_compute_meta: CUDA0 compute buffer size = 101.27 MiB
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: reserve_compute_meta: CPU compute buffer size = 6.77 MiB
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: load_hparams: projector: gemma4a
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: load_hparams: model size: 533.83 MiB
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: reserve_compute_meta: CUDA0 compute buffer size = 101.19 MiB
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: reserve_compute_meta: CPU compute buffer size = 1.58 MiB
+  ggml-org/gemma-4-E4B-it-GGUF:Q8_0: srv load_model: initializing, n_slots = 4, n_ctx_slot = 8192, kv_unified = 'false'
+  router: srv load: spawning server instance with name=google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0 on port 50115
+  google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0: srv load_model: [mtmd] estimated worst-case memory usage of mmproj is 1296.85 MiB (took 60.99 ms)
+  google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0: load_tensors: CUDA0 model buffer size = 13755.42 MiB
+  google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0: load_tensors: CUDA_Host model buffer size = 577.50 MiB
+  google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0: llama_context: CUDA_Host output buffer size = 4.00 MiB
+  google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0: llama_kv_cache: CUDA0 KV buffer size = 640.00 MiB
+  google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0: llama_kv_cache: size = 640.00 MiB ( 8192 cells, 5 layers, 4/4 seqs), K (f16): 320.00 MiB, V (f16): 320.00 MiB
+  google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0: llama_kv_cache: CUDA0 KV buffer size = 1800.00 MiB
+  google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0: llama_kv_cache: size = 1800.00 MiB ( 2304 cells, 25 layers, 4/4 seqs), K (f16): 900.00 MiB, V (f16): 900.00 MiB
+  google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0: sched_reserve: CUDA0 compute buffer size = 335.29 MiB
+  google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0: sched_reserve: CUDA_Host compute buffer size = 70.61 MiB
+  google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0: load_hparams: projector: gemma4v
+  google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0: load_hparams: model size: 1139.46 MiB
+  google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0: reserve_compute_meta: CUDA0 compute buffer size = 150.63 MiB
+  google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0: reserve_compute_meta: CPU compute buffer size = 6.77 MiB
+  google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0: srv load_model: initializing, n_slots = 4, n_ctx_slot = 8192, kv_unified = 'false'
+  router: srv load: spawning server instance with name=gpt-oss-120b-MXFP4-set-a on port 39315
+  gpt-oss-120b-MXFP4-set-a: load_tensors: CUDA0 model buffer size = 59851.68 MiB
+  gpt-oss-120b-MXFP4-set-a: load_tensors: CUDA_Host model buffer size = 586.82 MiB
+  gpt-oss-120b-MXFP4-set-a: llama_context: CUDA_Host output buffer size = 3.07 MiB
+  gpt-oss-120b-MXFP4-set-a: llama_kv_cache: CUDA0 KV buffer size = 4608.00 MiB
+  gpt-oss-120b-MXFP4-set-a: llama_kv_cache: size = 4608.00 MiB (131072 cells, 18 layers, 4/1 seqs), K (f16): 2304.00 MiB, V (f16): 2304.00 MiB
+  gpt-oss-120b-MXFP4-set-a: llama_kv_cache: CUDA0 KV buffer size = 36.00 MiB
+  gpt-oss-120b-MXFP4-set-a: llama_kv_cache: size = 36.00 MiB ( 1024 cells, 18 layers, 4/1 seqs), K (f16): 18.00 MiB, V (f16): 18.00 MiB
+  gpt-oss-120b-MXFP4-set-a: sched_reserve: CUDA0 compute buffer size = 221.04 MiB
+  gpt-oss-120b-MXFP4-set-a: sched_reserve: CUDA_Host compute buffer size = 153.54 MiB
+  gpt-oss-120b-MXFP4-set-a: srv load_model: initializing, n_slots = 4, n_ctx_slot = 131072, kv_unified = 'true'
+```
 
 ## I. The capacity table (Behavior 9)
 
@@ -430,7 +500,7 @@ audio encoders' buffers together.
 GB10: pool taken in GiB (MemAvailable, dropped cache) and the process's GPU / RSS in MiB. Framework:
 GTT taken in GiB and the process's GTT / RSS in MiB.
 
-| Model | Host | Idle alone (m) | Idle in the set (m) | Warmed peak (m) | Under load, highest (m) |
+| Model | Host | Idle alone (m) | Idle in the set (m) | Warmed peak (m) | Under load, highest after the cell (m) |
 | --- | --- | --- | --- | --- | --- |
 | gpt-oss-120b set-a | GB10 | 65.33 GiB; 64911 / 1265 | 64911 / 1265 | 65015 / 1539 | 65015 / 1572 |
 | gpt-oss-120b set-a | Framework | 63.92 GiB; 65459 / 219 | 65459 / 219 | 65686 / 258 | 65507 / 269 |
@@ -443,7 +513,7 @@ GTT taken in GiB and the process's GTT / RSS in MiB.
 
 ### I.3 Per host (m)
 
-| Host class | Ceiling (m) | Floor | Base use, nothing loaded (m) | Set A idle (m) | Set A warmed peak (m) | Set A under load, lowest (m) |
+| Host class | Ceiling (m) | Floor | Base use, nothing loaded (m) | Set A idle (m) | Set A warmed peak (m) | Set A under load, lowest during the cell (m) |
 | --- | --- | --- | --- | --- | --- | --- |
 | GB10 | 121.63 GiB (MemTotal) | 12.2 GiB (10% of the ceiling) | 3.93 GiB (121.63 − 117.70 MemAvailable; router 170 MiB GPU, 341 MiB RSS) | 21.45 GiB | 17.23 GiB | 10.39 GiB (L2, stopped); 19.35 GiB without L2 |
 | Framework | 112.00 GiB (GTT total); system memory 128,075 MiB | 11.2 GiB (10% of the GTT ceiling) | 0.28 GiB GTT used (router 2 MiB GTT, 97 MiB RSS) | 19.08 GiB | 18.08 GiB | 18.31 GiB GTT; system memory 12,658 MiB available |
@@ -621,6 +691,7 @@ line is left out too.
 14:45:30  load google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0
 14:45:44  load ggml-org/gemma-4-E4B-it-GGUF:Q8_0
 14:45:54  load mrutkows/granite-embedding-english-r2-GGUF:BF16
+14:45:57  date -u +%FT%TZ
 14:46:05  : 'set A loaded at 19:45:57Z; idle since, 30 s or more'
 14:46:05  ssh gb10-1 sudo -n /usr/sbin/sysctl vm.drop_caches=3
 14:46:06  memory
@@ -660,6 +731,7 @@ line is left out too.
 14:52:57  load google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0
 14:53:10  load ggml-org/gemma-4-E4B-it-GGUF:Q8_0
 14:53:20  load mrutkows/granite-embedding-english-r2-GGUF:BF16
+14:53:23  date -u +%FT%TZ
 14:53:28  : 'fresh set A loaded 19:53:23Z, idle 30 s or more, before L1-L4'
 14:53:28  ssh gb10-1 sudo -n /usr/sbin/sysctl vm.drop_caches=3
 14:53:30  memory
@@ -743,6 +815,7 @@ local), left out as above; every step sourced the helpers with `MEASURE_FLOOR_GI
 16:11:00  load google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0
 16:11:06  load ggml-org/gemma-4-E4B-it-GGUF:Q8_0
 16:11:12  load mrutkows/granite-embedding-english-r2-GGUF:BF16
+16:11:15  date -u +%FT%TZ
 16:11:48  : 'set A loaded 21:11:15Z, idle 30 s'
 16:11:48  memory
 16:11:48  footprint
@@ -776,6 +849,7 @@ local), left out as above; every step sourced the helpers with `MEASURE_FLOOR_GI
 16:19:06  load google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0
 16:19:12  load ggml-org/gemma-4-E4B-it-GGUF:Q8_0
 16:19:18  load mrutkows/granite-embedding-english-r2-GGUF:BF16
+16:19:21  date -u +%FT%TZ
 16:19:54  : 'fresh set A loaded 21:19:21Z, idle 30 s, before L1-L4'
 16:19:54  memory
 16:19:54  footprint
@@ -805,8 +879,10 @@ local), left out as above; every step sourced the helpers with `MEASURE_FLOOR_GI
 16:28:39  ssh framework 'free -m | sed -n 2p'
 ```
 
-The `free` lines are in the step log; their output is not, since they ran outside a helper. The
-session's record of it is section G's table.
+The `free` lines are in the step log; their output is not, since they ran outside a helper. Their
+output is recorded in `.state/footprint/framework-free.txt` (untracked raw output, like the step
+logs), the source of section G's table. The first read, after P1, was `free -g`; no read was
+taken at set A idle before P1.
 
 ### Commands as run (gb10-2)
 
