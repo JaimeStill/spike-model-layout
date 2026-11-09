@@ -1,12 +1,12 @@
 # goal · experiment.hosting.spike-model-layout
 
-- **State:** brief ready
-- **Task:** hosts
-- **Branch:** hosts
+- **State:** idle
+- **Task:** none
+- **Branch:** none
 
 ## Tasks
 
-1. [ ] hosts
+1. [x] hosts
 2. [ ] footprint
 3. [ ] role-split
 4. [ ] framework
@@ -110,12 +110,6 @@ Door          two-way: pins and preset revert by pull request; the container is
               sudoers rule goes with its file.
 ```
 
-## Progress
-
-slices 3/4 committed (slice 4 is the architect's walkthrough, after the session brief) · standards done (ce2fa1f, 8454a41) · spec done (3 gaps closed in e2587f3) · editor done
-
-- Engines clones: gb10-1's, gb10-2's and the Framework's spike-model-engines clones are on local branch `hosts` at 3b60fa4, pushed as `hosts-next`. After SHIP merges the engines pull request, each host runs `git switch main && git pull --ff-only && git branch -D hosts hosts-next`, and its router is restarted only if the merge changed the preset.
-- gb10-2's drop-caches rule installed by the architect 2026-11-09; `sudo -n -l` lists it on both GB10s (Behavior 8).
 
 ## Decisions
 
