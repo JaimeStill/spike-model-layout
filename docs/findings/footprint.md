@@ -922,6 +922,47 @@ last paragraph. The `jq` printed the `peg-gemma4` error quoted in section G; the
 search printed nothing. The pings, at 21:02:53Z: gb10-1 direct, 3 ms; at
 21:09:21Z: framework direct, 3 ms.
 
+## L. The architect's walkthrough (slice 4)
+
+The architect ran slice 4 on gb10-1 at 18:07-18:14 local, from their own shell, sourcing the step
+helpers, so every command is in gb10-1's step log (`.state/measure/gb10-1/2026-11-09.log`). It
+reproduces section C's 26B-A4B row and section F's P2a growth.
+
+```
+# 18:07:43
+source scripts/measure-lib.sh gb10-1
+export MEASURE_FLOOR_GIB=12.2
+# 18:10:45, refused: the sudoers rule names /usr/sbin/sysctl exactly, so `sudo -n` declines
+# /usr/bin/sysctl (rc 1)
+ssh gb10-1 sudo -n /usr/bin/sysctl vm.drop_caches=3
+# 18:10:57, an interactive shell on gb10-1, where the architect ran
+ssh gb10-1
+sudo -n /usr/sbin/sysctl vm.drop_caches=3      # vm.drop_caches = 3
+memory                                          # 117.63 GiB available (MemAvailable)
+t0=$(date -u +%FT%TZ)
+load google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0   # loaded in 15.2 s, --ctx-size 32768 --parallel 4
+ssh gb10-1                                      # sudo -n /usr/sbin/sysctl vm.drop_caches=3 there
+footprint 2026-11-09T23:11:28Z
+cell footprint-walk-p2a footprint-p2a google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0 google/gemma-4-26B-A4B-it
+ssh gb10-1                                      # sudo -n /usr/sbin/sysctl vm.drop_caches=3 there
+footprint
+unload --all
+```
+
+| | Section C / F (19:41-19:49Z) | Walkthrough (23:11-23:14Z) |
+| --- | --- | --- |
+| Load time | 12.8 s | 15.2 s |
+| MemAvailable before → after load | 117.73 → 98.78 GiB (18.95 taken) | 117.63 → 98.73 GiB (18.90 taken) |
+| Process GPU / RSS after load | 18015 / 1217 MiB | 18015 / 1217 MiB |
+| Logged buffers | section C's row | the same lines, figure for figure |
+| P2a, one 1440p image | 1 of 1 ok; TTFT 3149 ms; ITL 14.11 ms | 1 of 1 ok; TTFT 2893 ms; ITL 14.29 ms |
+| Process GPU / RSS after P2a | 18826 / 1989 MiB (+811 / +772) | 18826 / 1989 MiB (+811 / +772) |
+| Pool after P2a | 19.52 GiB, with set A loaded | 97.04 GiB, the 26B-A4B alone |
+
+The figures that don't depend on what else is loaded reproduce exactly: the buffers, the process's
+GPU memory, and P2a's growth. gb10-1 ends with nothing loaded. The architect then read section
+I.7's worked placement.
+
 ## K. Open items for later tasks
 
 - **The Gemma sections' prompt cache.** At the default `cache-ram` (8192 MiB a process), set A

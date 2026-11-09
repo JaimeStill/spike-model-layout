@@ -143,9 +143,9 @@ Door          two-way: the helper and scenarios revert by commit; hosts change o
 
 ## Progress
 
-slices 3/4 committed (slice 1: helper and scenarios 288b73a, gb10-1 measured; slice 2: the Framework measured, serving a fresh set A; slice 3: finding and capacity table 4ba8f9e; step logs .state/measure/<host>/2026-11-09.log) · standards done (67fe8b4) · spec done (6c6a92e, e2b75c0) · editor done
+slices 4/4 done (slice 1: helper and scenarios 288b73a, gb10-1 measured; slice 2: the Framework measured, serving a fresh set A; slice 3: finding and capacity table 4ba8f9e; step logs .state/measure/<host>/2026-11-09.log) · standards done (67fe8b4) · spec done (6c6a92e, e2b75c0) · editor done
 
-Next: slice 4, the architect's walkthrough on gb10-1 (26B-A4B alone load and footprint read, cell footprint-walk-p2a, the I.7 placement read), then BRIEF.
+Next: BRIEF.
 
 ## Decisions
 
@@ -207,6 +207,7 @@ Next: slice 4, the architect's walkthrough on gb10-1 (26B-A4B alone load and foo
 - footprint (BUILD): the Framework ends with set A reloaded fresh after L4, dropping the 26B-A4B's prompt cache from L2 (RSS 9867 MiB).
 - footprint (BUILD): per-process figures under load are read once after each cell, not as each process's highest during L1-L4: `watch` samples only the pool, so the pool's lowest is a during-cell figure and the process figures are after-cell reads. The prompt cache that drives the finding holds its size until reload, so its after-read is its peak.
 - footprint (BUILD): the Framework's `free -m` outputs, which the step log doesn't hold, are kept in `.state/footprint/framework-free.txt` as the session's tool output showed them; no read was taken at set A idle before P1.
+- footprint (BUILD): the architect's walkthrough reproduced section C's 26B-A4B row and P2a's growth (+811 MiB GPU, +772 MiB RSS) exactly; a cache drop typed with /usr/bin/sysctl was refused by the exact-path sudoers rule and rerun on gb10-1 with /usr/sbin/sysctl. Recorded in the finding's section L.
 
 ## Pending edits
 
