@@ -143,9 +143,9 @@ Door          two-way: the helper and scenarios revert by commit; hosts change o
 
 ## Progress
 
-slices 0/4 committed (slice 1 in progress) · standards — · spec — · editor —
+slices 1/4 done (slice 1: helper and scenarios 288b73a; gb10-1 measured, step log .state/measure/gb10-1/2026-11-09.log) · standards — · spec — · editor —
 
-Slice 1: helper and scenarios committed (288b73a); root updates done (.state/footprint/root-updates.md); gb10-1 alone loads (6 sections), set A together, P1-P4 done (step log .state/measure/gb10-1/2026-11-09.log). Paused 19:53Z with a fresh set A loaded on gb10-1 (read 5 s after load: 21.46 GiB); next: re-read set A after 30 s idle, then L1-L4, quote gb10-2's log, unload gb10-1.
+Next: slice 2, the Framework.
 
 ## Decisions
 
@@ -198,6 +198,10 @@ Slice 1: helper and scenarios committed (288b73a); root updates done (.state/foo
 - footprint: the capacity table carries measured and computed columns, each marked (largest c and 131,072-token sessions above the floor; input token costs for images and audio).
 - footprint: Gemma 4 26B-A4B's Vulkan aborts are recorded as a constraint row (K layer under 4 GiB, so c < 2,097,152; #29221 at 15 slots), not tested; testing is the framework task's.
 - footprint: the session ends with the Framework serving set A and gb10-1 with nothing loaded, as hosts left it, since role-split loads what it compares.
+- footprint (BUILD): set A's first idle read on gb10-1 came 8 s after the last load; a second read at 45 s gave the same figure (21.45 GiB), so the brief's 30 s read stands; the reload before L1-L4 was read again after the architect's pause.
+- footprint (BUILD): L2 (vision-b at 1440p) stopped under gb10-1's floor at 66 s (10.39 GiB): the 26B-A4B's RSS grew 1.2 -> 10.4 GiB with its GPU memory flat, llama.cpp's host prompt cache filling to its cache-ram default (8192 MiB), which set A's Gemma sections leave on. Recorded as a finding; L2 not rerun; capping it is a preset change, outside this task.
+- footprint (BUILD): after L2's stop, only the 26B-A4B was reloaded (unload, load) to return above the floor before L3 and L4, which measure the E4B and granite.
+- footprint (BUILD): gb10-1's network path turned direct (LAN, 3 ms) after the architect's pause, from DERP(nyc) 56 ms; L1-L4's TTFT ran on it. Speed isn't judged in this task.
 
 ## Pending edits
 
