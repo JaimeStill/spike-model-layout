@@ -230,6 +230,17 @@ About to delete 4 repo(s) totalling 32.5G.
 Both stores now hold set A's four repos and nothing else: gpt-oss-120b GGUF 63.4G, gemma-4-26B-A4B
 QAT 15.6G, gemma-4-E4B Q8_0 8.6G, granite-embedding GGUF 299.9M.
 
+gb10-2's store went through the task unchanged. Its listing before
+(`.state/hosts/align/gb10-2-repos-store-before.txt`) names the same four repositories, and no file
+in it is newer than the session's start, so nothing was downloaded or rewritten:
+
+```sh
+ssh gb10-2 'cd ~/repos/spike-model-engines && MISE_ENV=host HF_HUB_CACHE=/srv/models mise exec -- hf cache ls --format json 2>/dev/null; echo; find -L /srv/models/models--* -type f -newermt "2026-11-09" | wc -l; find /srv/models -type f -newermt 2026-11-09 | head'
+```
+
+It listed the four at 8.6G, 63.4G, 15.6G and 299.9M, last modified one to two weeks ago, and
+counted 0 files newer than 2026-11-09.
+
 **gb10-1's drift removed** (`.state/hosts/align/gb10-1-drift.log`, as run):
 
 ```
@@ -276,7 +287,9 @@ Each table's header rows are omitted above; the record holds them.
 
 **Result.** `.bashrc` is identical on the two GB10s. Their home directories' top-level entries
 differ only in `.lesshst` and `.viminfo`, and the router containers' settings (the after-inspects
-in `.state/hosts/align/`) differ only in the tailnet address each binds. Deeper per-host app state
+in `.state/hosts/align/`) differ only in the tailnet address each binds. Over the whole inspect
+output, with the per-container fields removed, one more field differs without effect:
+`HostConfig.Dns` is `[]` on gb10-1 and `null` on gb10-2, neither setting a DNS server. Deeper per-host app state
 (dconf, btop, eog, gtk-4.0, yelp, the pnpm and fastfetch caches, and gb10-2's lazygit) is left as
 each host's own use.
 
@@ -468,5 +481,7 @@ counting none.
 - gb10-2 has no host descriptor and no run-noise figure in spike-hosting-upgrades. This session's
   within-session spread on gb10-2 (A 2.37%, B 0.52% output tok/s) is the first.
 - gb10-2's drop-caches sudoers rule, pending above.
-- The spike-model-engines `hosts` pull request is open; each host's clone returns to `main` once
-  it merges.
+- The spike-model-engines `hosts` branch is published as a pull request, and merged, when the
+  architect accepts this task's session brief; until then commit 3b60fa4 lives on the laptop's
+  branch and on each host's local `hosts` branch, pushed to the hosts over SSH. Each host's clone
+  returns to `main` once it merges.
