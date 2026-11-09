@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Copied from spike-hosting-upgrades (2e64fe5), where measure.md and rules.md are its skill's files;
-# this spike's hosts task adapts it to the layout's runs.
+# Copied from spike-hosting-upgrades (2e64fe5) and adapted by this spike's hosts task: its root is
+# this repository, and tier and conform are dropped, since this spike runs no BFCL tier or conform
+# run. measure.md and rules.md, cited below, are spike-hosting-upgrades' files (its measure skill's),
+# not this repository's.
 # The measure mode's step helpers (measure.md, "Step helpers"), sourced from the project root, one
 # host a shell, and called one step at a time in the architect's view:
 #
@@ -19,10 +21,10 @@
 # MEASURE_LOG=off, set for the `source` line, sources the helpers read-only: no log, no xtrace,
 # nothing appended, for reading a finished run (`summarize`, `loaded`, `memory`, `readout`,
 # `routing`, `image`) without adding to the day's log. The helpers that load the host (load,
-# unload, watch, cell, tier, conform, gate) refuse there.
+# unload, watch, cell, gate) refuse there.
 #
-# No helper runs a benchmark on its own or chains cells: `cell` runs one GuideLLM scenario, `tier`
-# one agent tier, `conform` one conform run, each under `watch`, and `gate` only loads and unloads.
+# No helper runs a benchmark on its own or chains cells: `cell` runs one GuideLLM scenario under
+# `watch`, and `gate` only loads and unloads.
 # The helpers that change the host (load, unload, gate) do so only through the router's API.
 #
 #   loaded                          the sections the router has loaded or loading
@@ -30,10 +32,7 @@
 #   unload <section>|--all          unload one section (or every loaded one), wait until unloaded
 #   cell <name> <scenario> [<section> <tokenizer>]
 #                                   one GuideLLM cell from bench/<scenario>.yaml, under watch
-#   tier <name> <bfcl-single|bfcl-multi> <section> [<first N>]
-#                                   one spike-model-hosting BFCL tier, under watch
-#   conform <name> <class> [<k>]    one conform run through Pi, under watch
-#   summarize <name>                a result's figures: a cell's, a tier's, and its watch's
+#   summarize <name>                a result's figures: a cell's and its watch's
 #   memory                          one memory read-out on the host, and the floor
 #   routing                         rules.md's routing check: the host's .lan records, what the bare
 #                                   name resolves to, and 50 connects to the router's /health
@@ -48,10 +47,8 @@
 #                          probed ceiling, e.g. 12.2 on gb10-1, 11.2 on framework
 #   MEASURE_SAMPLE_EVERY   seconds between watch's samples (default 10)
 #   MEASURE_READOUT_EVERY  seconds between watch's readouts (default 300)
-#   MEASURE_CELL_CAP       a cell's cap (default 10m); MEASURE_TIER_CAP a tier's (default 15m);
-#                          MEASURE_CONFORM_CAP conform's (default 10m)
+#   MEASURE_CELL_CAP       a cell's cap (default 10m)
 #   MEASURE_LOAD_WAIT      seconds a load or unload may take (default 600)
-#   MEASURE_HOSTING        spike-model-hosting's checkout (default ~/experiments/spike-model-hosting)
 #   MEASURE_CONTAINER      the engine's container on the host (default llama)
 
 if ! (return 0 2>/dev/null); then
@@ -66,7 +63,7 @@ fi
 MEASURE_HOST=$1
 MEASURE_PORT=${2:-8080}
 MEASURE_URL=http://$1:$MEASURE_PORT
-MEASURE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)
+MEASURE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 MEASURE_STATE=$MEASURE_ROOT/.state/measure/$MEASURE_HOST
 MEASURE_LOG_FILE=$MEASURE_STATE/$(date +%F).log
 export GUIDELLM__SPEC__BACKEND__TARGET=$MEASURE_URL
@@ -367,55 +364,12 @@ cell() {
   return "$rc"
 }
 
-tier() {
-  case $-:${_measure_marking-} in
-    *x*:) _measure_marked tier "$@"; return ;;
-    *:on) _measure_marking=in; set -x ;;
-    *:off) _measure_refuse tier; return ;;
-  esac
-  local name=${1:?usage: tier <name> <bfcl-single|bfcl-multi> <section> [<first N>]} which=${2-} section=${3-} first=${4-}
-  local hosting=${MEASURE_HOSTING:-$HOME/experiments/spike-model-hosting} list
-  [[ $which == bfcl-single || $which == bfcl-multi ]] && [[ -n $section ]] ||
-    { echo 'usage: tier <name> <bfcl-single|bfcl-multi> <section> [<first N>]' >&2; return 2; }
-  list=$hosting/evaluation/tiers/agent-$which.txt
-  if [[ -n $first ]]; then
-    # The tier's list cut to its first N samples, with its header (tier, dataset, seed) kept.
-    { grep '^#' "$list"; grep -v '^#' "$list" | head -n "$first"; } >"$MEASURE_STATE/$name-list.txt"
-    list=$MEASURE_STATE/$name-list.txt
-  fi
-  watch "$name" env -C "$hosting/evaluation" PYTHONDONTWRITEBYTECODE=1 \
-    UV_PROJECT_ENVIRONMENT="$MEASURE_STATE/../suites-venv" HF_HOME="$MEASURE_STATE/../cache/huggingface" \
-    INSPECT_EVALS_CACHE_DIR="$MEASURE_STATE/../cache/inspect_evals" MISE_ENV=consumers \
-    timeout "${MEASURE_TIER_CAP:-15m}" mise exec -- uv run --project suites --locked --no-python-downloads \
-    python suites/agent_quality.py eval --router "$MEASURE_URL" --model "$section" --tier "$which" \
-    --list "$list" --slots 4 --output "$MEASURE_STATE/$name"
-  local rc=$?
-  summarize "$name"
-  return "$rc"
-}
-
-conform() {
-  case $-:${_measure_marking-} in
-    *x*:) _measure_marked conform "$@"; return ;;
-    *:on) _measure_marking=in; set -x ;;
-    *:off) _measure_refuse conform; return ;;
-  esac
-  local name=${1:?usage: conform <name> <class> [<k>]} class=${2:?usage: conform <name> <class> [<k>]}
-  local hosting=${MEASURE_HOSTING:-$HOME/experiments/spike-model-hosting}
-  watch "$name" env -C "$hosting/evaluation" MISE_ENV=consumers timeout "${MEASURE_CONFORM_CAP:-10m}" \
-    mise exec -- go run ./cmd/evaluate conform -router "$MEASURE_URL" \
-    -profile "$MEASURE_ROOT/bench/conform/$class.toml" -consumers pi -k "${3:-5}" -state "$MEASURE_STATE/$name"
-  local rc=$?
-  tail -n 8 "$MEASURE_STATE/$name.log"
-  return "$rc"
-}
-
 summarize() {
   case $-:${_measure_marking-} in
     *x*:) _measure_marked summarize "$@"; return ;;
     *:on) _measure_marking=in; set -x ;;
   esac
-  local name=${1:?usage: summarize <name>} f
+  local name=${1:?usage: summarize <name>}
   _measure_quiet "summarizing $name"
   if [[ -f $MEASURE_STATE/$name.json ]]; then
     # A GuideLLM cell, one line a benchmark (a sweep level). "completed" is the completed-request
@@ -431,20 +385,6 @@ summarize() {
         + "; TTFT median \($m.time_to_first_token_ms.successful.median | round) ms; ITL median \($m.inter_token_latency_ms.successful.median * 100 | round / 100) ms"
         + (($m.audio.seconds.input_per_second.successful.mean // 0) as $a | if $a > 0 then "; audio s/s \($a * 100 | round / 100)" else "" end)' \
       "$MEASURE_STATE/$name.json"
-  fi
-  # Inspect names its log by time and a random id, letters and digits only, so ls reads it safely.
-  # shellcheck disable=SC2012
-  f=$(ls -t "$MEASURE_STATE/$name"/*.json 2>/dev/null | head -n 1)
-  if [[ -n $f ]]; then
-    # An Inspect log (a BFCL tier): samples done and passing, the sample times, the largest
-    # reply, and the replies that stopped at a token or context limit (cap hits).
-    jq -r '[.samples[]?] as $s
-      | [$s[] | .events[]? | select(.event == "model") | {id: null, out: (.output.usage.output_tokens // 0), stop: (.output.choices[0].stop_reason // "")}] as $calls
-      | ([$s[] | . as $x | [.events[]? | select(.event == "model") | .output.usage.output_tokens // 0] | {id: $x.id, out: (max // 0)}] | max_by(.out)) as $big
-      | "status \(.status); samples done \($s | length), passing \([$s[] | select((.scores | to_entries[0].value.value) == 1)] | length)"
-        + "; sample secs \([$s[] | .total_time | floor])"
-        + "; largest reply \($big.out // 0) tokens (\($big.id // "-"))"
-        + "; cap hits (stop max_tokens or model_length) \([$calls[] | select(.stop == "max_tokens" or .stop == "model_length")] | length)"' "$f"
   fi
   if [[ -f $MEASURE_STATE/$name.exit ]]; then
     echo "exit: $(cat "$MEASURE_STATE/$name.exit")"
