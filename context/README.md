@@ -75,7 +75,8 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
 
 - **Host bring-up:** all three hosts serve from spike-model-engines' engines suite and shared
   preset, and cells on gb10-1 and gb10-2 compare, [`docs/findings/hosts.md`](../docs/findings/hosts.md).
-- **The footprint table:** memory per model per host class, `docs/findings/footprint.md`.
+- **The footprint table:** each set A model's memory on a GB10 and on the Framework, and the
+  capacity table placements are computed from, [`docs/findings/footprint.md`](../docs/findings/footprint.md).
 - **Measured sessions and requests** per placed model, at its context.
 - **The full-set and role-split comparison** across the two GB10s.
 - **The Framework's placement** in the layout.
@@ -85,7 +86,8 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
 - **The layout document:** [`docs/layout.md`](../docs/layout.md), living, finalized by the answer.
 - **The step helpers:** `scripts/measure-lib.sh`, adapted from spike-hosting-upgrades' without its
   tier and conform helpers, sourced and called one step at a time, logging every command to this
-  spike's `.state/measure/<host>/`.
+  spike's `.state/measure/<host>/`. The read-only `footprint` helper prints each llama-server
+  process's memory, the pool, and the router's buffer lines.
 
 ## Path
 
@@ -98,7 +100,10 @@ and load targets are agreed in its task's own plan round.
 2. `footprint`: memory per model on a GB10 and on the Framework, and the capacity table
    (evidence 2).
 3. `role-split`: set A on one GB10, then the roles split across both GB10s, compared in one
-   session (evidence 3, 4).
+   session (evidence 3, 4). It starts from the footprint finding's open items (section K): set A's
+   two Gemma sections leave llama.cpp's host prompt cache (`cache-ram`) at its 8192 MiB default,
+   which took gb10-1 under its floor under vision load, and capping it is a pull request to
+   spike-model-engines' `host/` citing that finding.
 4. `framework`: the Framework in the role the role-split findings point to (evidence 3, 5).
 5. `agent-vllm`: gpt-oss-120b on vLLM v0.33.0 in a container against llama.cpp on the agent GB10,
    in one session (evidence 6).

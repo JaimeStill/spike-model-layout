@@ -72,7 +72,7 @@ step logs' local times (UTC−5); the prose gives UTC.
 
 ## A. Hosts brought current (Behavior 1)
 
-From `.state/footprint/root-updates.md`. gb10-2, the architect, pasted in full:
+From `.state/footprint/root-updates.md`. **gb10-2:** the architect ran this command and pasted its output in full:
 
 ```
 sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y && cat /var/run/reboot-required 2>/dev/null; echo "exit $?"
@@ -107,8 +107,8 @@ pool's lowest is the watch's.
 **Decision it informs:** what each model costs on its own, the input to any placement.
 
 **Configuration.** Each set A section loaded alone with nothing else loaded (`unload --all` first),
-on gb10-1 from a dropped page cache before and after, on the Framework from GTT. Load: none; each
-load read once, idle. Duration: the load time below, plus about 5 s of reads.
+on gb10-1 from a dropped page cache before and after, on the Framework from GTT. Load: no requests;
+each section read once, idle. Duration: the load time below, plus about 5 s of reads.
 
 ### gb10-1
 
@@ -202,7 +202,7 @@ slots of 8,192. That is 35.16 MiB per 1,000 tokens.
 
 **Sliding-window KV and compute follow the KV mode and the slot count, not c.** Per slot, the SWA
 cache is 27 MiB (768 cells) at 4 slots and at 16; the unified pool keeps one 1024-cell window for
-all 4 slots, 36 MiB. Compute is 98.77 MiB GPU and 31.28 MiB host per-slot at both 4 and 16 slots,
+all 4 slots, 36 MiB. Compute is 98.77 MiB GPU and 31.28 MiB host per slot at both 4 and 16 slots,
 against 221.04 and 153.54 MiB unified. The output buffer grows with slots: 3.07 MiB at 4, 12.27 MiB
 at 16.
 
@@ -222,8 +222,7 @@ gb10-1's first read came 8 s after the last load (19:46:05Z, 21.46 GiB by `memor
 gave 21.45 GiB, the same within 0.01 GiB, so the 30 s read stands.
 
 Each process in the set read the GPU or GTT figure it read alone, its RSS within 1 MiB, on both
-hosts: gb10-1 64911, 18015, 6530 and
-863 MiB GPU with RSS 1265, 1217, 4144 and 829 MiB; the Framework 65459, 18380, 9929 and 1102 MiB GTT
+hosts: gb10-1 64911, 18015, 6530 and 863 MiB GPU with RSS 1265, 1217, 4144 and 829 MiB; the Framework 65459, 18380, 9929 and 1102 MiB GTT
 with RSS 219, 241, 246 and 122 MiB. The sum of the four alone figures is the set's:
 
 - gb10-1: 65.33 + 18.95 + 10.40 + 1.52 = 96.20 GiB; 117.71 − 96.20 = 21.51 GiB, against 21.45
@@ -289,8 +288,8 @@ Each step's figures, gb10-1 (pool MemAvailable, after a drop) and Framework (GTT
 | P3b | 17.47 | E4B 6758 GPU, 4670 RSS | 18.11 | E4B 10007 GTT, 432 RSS |
 | P4 | 17.23 | granite 977 GPU, 962 RSS | 18.08 | granite 1140 GTT, 131 RSS |
 
-The 26B-A4B's RSS growth through P2 is its host prompt cache starting to fill: the readouts count
-3 idle-slot saves in each P2 cell and 1 prompt save in P2c. Section G shows where that cache goes.
+The 26B-A4B's RSS growth through P2 is its host prompt cache starting to fill: `watch`'s
+`readout` lines count 3 idle-slot saves in each P2 cell and 1 prompt save in P2c. Section G shows where that cache goes.
 
 ## G. Under load, L1-L4 (Behavior 7)
 
@@ -326,9 +325,10 @@ L4's incomplete requests are those in flight when its 30 s level ended.
 `memory floor: 10636 MiB available under 12.2 GiB at 21:06:10; stopping footprint-gb10-1-l2` (10.39
 GiB; `memory` read 10.38 GiB just after). GuideLLM's last progress line, at 52.8 s, counted 12 of
 32 requests complete; stopped, it wrote no JSON.
-The 26B-A4B's GPU memory stayed flat (18828 MiB) while its **RSS grew 1217 → 10397 MiB**: llama.cpp's
-host prompt cache, `cache-ram`, filling toward its default of 8192 MiB (the readout counts 30
-idle-slot saves and 40 prompt saves). Set A's two Gemma sections leave `cache-ram` at that default;
+
+The 26B-A4B's GPU memory stayed flat (18828 MiB) while its **RSS grew 1217 → 10397 MiB**:
+llama.cpp's host prompt cache, `cache-ram`, filling toward its default of 8192 MiB (`watch`'s
+`readout` line counts 30 idle-slot saves and 40 prompt saves). Set A's two Gemma sections leave `cache-ram` at that default;
 gpt-oss set-a sets `cache-ram = 0`. Recorded as a finding; L2 was not rerun, since capping the cache
 is a preset change outside this task. Only the 26B-A4B was then reloaded (unload, load, 12.2 s),
 which returned the pool to 20.68 GiB before L3 and L4, the cells that measure the E4B and granite.
@@ -580,7 +580,7 @@ memory bounds, not configurations known to run.
 
 | Input | Tokens | Source | KV it takes (full attention) |
 | --- | --- | --- | --- |
-| Image, on the 26B-A4B section | 560 to 1,120 a image | the section's `image-min-tokens = 560` and `ub = 1120` (an image's tokens are capped at n_ubatch) | 10.94 to 21.88 MiB (× 20,480 B/token); P2b's two 1440p images are up to 2,240 tokens, 43.75 MiB |
+| Image, on the 26B-A4B section | 560 to 1,120 an image | the section's `image-min-tokens = 560` and `ub = 1120` (an image's tokens are capped at n_ubatch) | 10.94 to 21.88 MiB (× 20,480 B/token); P2b's two 1440p images are up to 2,240 tokens, 43.75 MiB |
 | Audio, on the E4B | about 25 tokens a second | 15,028 input tokens for a 10-minute 16 kHz mono WAV on gb10-2's E4B Q8_0 (the roadmap note on spike-ai-pipeline-processing's audio finding): 15,028 / 600 s = 25.05 | 0.39 MiB a second (× 16,384 B/token); P3a's 29.4 s clip about 736 tokens, 11.5 MiB; a 10-minute WAV 234.81 MiB, against the section's 8,192-token slot (sizing that request is role-split's) |
 
 The E4B section sets neither image key, so the 560 to 1,120 range is the 26B-A4B's only.
@@ -604,8 +604,8 @@ of 131,072 tokens, the KV per slot, with set-a's `cache-ram = 0`:
 
 **Nine 131,072-token sessions**, c = 9 × 131,072 = 1,179,648 with 9 slots, leaving 0.82 GiB above
 the floor with the reserve (4.14 GiB without). The roadmap's estimate for this placement, about
-49 GiB of KV and roughly 10 sessions (the architect, 2026-10-30), reads 44.88 GiB and 9 here. The
-count assumes compute stays at 98.77 MiB per-slot at 9 slots (measured at 4 and 16); it is a
+49 GiB of KV and roughly 10 sessions (the architect, 2026-10-30), is 44.88 GiB and 9 sessions here. The
+count assumes compute stays at 98.77 MiB per slot at 9 slots (measured at 4 and 16); it is a
 computed placement, not a loaded one: role-split loads what it compares.
 
 ## J. Every run

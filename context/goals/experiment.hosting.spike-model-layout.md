@@ -143,9 +143,9 @@ Door          two-way: the helper and scenarios revert by commit; hosts change o
 
 ## Progress
 
-slices 3/4 done (slice 1: helper and scenarios 288b73a, gb10-1 measured; slice 2: the Framework measured, serving a fresh set A; slice 3: finding and capacity table 4ba8f9e; step logs .state/measure/<host>/2026-11-09.log) · standards — · spec — · editor —
+slices 3/4 committed (slice 1: helper and scenarios 288b73a, gb10-1 measured; slice 2: the Framework measured, serving a fresh set A; slice 3: finding and capacity table 4ba8f9e; step logs .state/measure/<host>/2026-11-09.log) · standards done (67fe8b4) · spec done (6c6a92e, e2b75c0) · editor done
 
-Next: standards review, spec review, editor; then slice 4, the architect's walkthrough.
+Next: slice 4, the architect's walkthrough.
 
 ## Decisions
 
@@ -186,10 +186,10 @@ Next: standards review, spec review, editor; then slice 4, the architect's walkt
 - hosts (BUILD): gb10-1's deeper app state (dconf, btop, eog, gtk-4.0, yelp, the pnpm and fastfetch caches) and gb10-2's lazygit stay as each host's own use, not drift. ~/.humming and ~/.config/NVIDIA counted as vLLM and AI Workbench leftovers and were removed.
 - hosts (BUILD): gb10-2 uses gb10-1's memory floor of 12.2 GiB: the hardware is the same, and gb10-2 has no host descriptor.
 
-- footprint: measures set A's four sections only; the GB10 stores hold set A alone and the preset is offline, so the extras can't be measured on both host classes.
+- footprint: measures set A's four sections only; the GB10 stores hold set A alone and the shared preset sets `offline = true` (models.ini:21), so the router downloads nothing and the extras can't be measured on both host classes.
 - footprint: the GB10 measured is gb10-1, idle with nothing loaded; gb10-2's current load log is quoted as a cross-check, with no load or request on gb10-2.
 - footprint: per-process memory comes from a new read-only `footprint` step helper (nvidia-smi compute-apps and ps RSS on a GB10, amdgpu_top -p on the Framework, by --alias, plus the pool and the load log's buffer lines), logged to the step log; no new tool.
-- footprint: each set A model is loaded alone from a dropped page cache, then set A together after 30 s idle.
+- footprint: each set A model is loaded alone (on a GB10 from a dropped page cache, on the Framework read by GTT), then set A together after 30 s idle.
 - footprint: KV per 1,000 tokens comes from each section's logged KV buffers, with linearity checked on gb10-1 by loading gpt-oss-120b's existing c 32768 x 4 and c 131072 x 16 sections; no preset change.
 - footprint: the warmed peak comes from GuideLLM warm-up cells P1-P4 on freshly loaded set A after 30 s idle, under `watch` every 10 s (spike-model-hosting's method).
 - footprint: P1 sends gpt-oss-120b a ~100,000-token prompt (256 out, cap 10 min), not 8,192, so the peak reflects the agent's session depth.
@@ -198,23 +198,25 @@ Next: standards review, spec review, editor; then slice 4, the architect's walkt
 - footprint: the capacity table carries measured and computed columns, each marked (largest c and 131,072-token sessions above the floor; input token costs for images and audio).
 - footprint: Gemma 4 26B-A4B's Vulkan aborts are recorded as a constraint row (K layer under 4 GiB, so c < 2,097,152; #29221 at 15 slots), not tested; testing is the framework task's.
 - footprint: the session ends with the Framework serving set A and gb10-1 with nothing loaded, as hosts left it, since role-split loads what it compares.
-- footprint (BUILD): set A's first idle read on gb10-1 came 8 s after the last load; a second read at 45 s gave the same figure (21.45 GiB), so the brief's 30 s read stands; the reload before L1-L4 was read again after the architect's pause.
-- footprint (BUILD): L2 (vision-b at 1440p) stopped under gb10-1's floor at 61 s (10.39 GiB): the 26B-A4B's RSS grew 1.2 -> 10.4 GiB with its GPU memory flat, llama.cpp's host prompt cache filling to its cache-ram default (8192 MiB), which set A's Gemma sections leave on. Recorded as a finding; L2 not rerun; capping it is a preset change, outside this task.
+- footprint (BUILD): set A's first idle read on gb10-1 came 8 s after the last load (21.46 GiB); a second read at 47 s gave 21.45 GiB, the same within 0.01 GiB, so the brief's 30 s read stands; the reload before L1-L4 was read again after the architect's pause.
+- footprint (BUILD): L2 (vision-b at 1440p) stopped under gb10-1's floor at 61 s (10.39 GiB): the 26B-A4B's RSS grew 1217 -> 10397 MiB with its GPU memory flat, llama.cpp's host prompt cache filling toward its `cache-ram` default (8192 MiB), which set A's Gemma sections leave on. Recorded as a finding; L2 not rerun; capping it is a preset change, outside this task.
 - footprint (BUILD): after L2's stop, only the 26B-A4B was reloaded (unload, load) to return above the floor before L3 and L4, which measure the E4B and granite.
 - footprint (BUILD): gb10-1's network path turned direct (LAN, 3 ms) after the architect's pause, from DERP(nyc) 56 ms; L1-L4's TTFT ran on it. Speed isn't judged in this task.
-- footprint (BUILD): on the Framework, llama.cpp's host prompt cache sits in system RAM outside GTT, so the GTT floor watch can't see it; L2 grew the 26B-A4B's RSS to 9.87 GiB with GTT flat, system RAM available 23,639 -> 13,660 MiB (free -m). The session read `free` beside each Framework cell.
+- footprint (BUILD): on the Framework, llama.cpp's host prompt cache sits in system RAM outside GTT, so the GTT floor watch can't see it; L2 grew the 26B-A4B's RSS 239 -> 9867 MiB with GTT nearly flat (92.97 -> 93.61 GiB used), system RAM available 23,639 -> 13,660 MiB (free -m). The session read `free` beside each Framework cell.
 - footprint (BUILD): one of L2's 32 requests on the Framework errored in llama.cpp's Gemma 4 output parser ("does not match the expected peg-gemma4 format"), not on memory; recorded, not rerun.
-- footprint (BUILD): the Framework ends with set A reloaded fresh after L4, dropping L2's 9.9 GiB prompt cache.
+- footprint (BUILD): the Framework ends with set A reloaded fresh after L4, dropping the 26B-A4B's prompt cache from L2 (RSS 9867 MiB).
 - footprint (BUILD): per-process figures under load are read once after each cell, not as each process's highest during L1-L4: `watch` samples only the pool, so the pool's lowest is a during-cell figure and the process figures are after-cell reads. The prompt cache that drives the finding holds its size until reload, so its after-read is its peak.
 - footprint (BUILD): the Framework's `free -m` outputs, which the step log doesn't hold, are kept in `.state/footprint/framework-free.txt` as the session's tool output showed them; no read was taken at set A idle before P1.
 
 ## Pending edits
 
 - coordinator · ai-hosting.md "Hosts and access": the drop-caches rule on both GB10s.
-- coordinator · ai-hosting.md "gb10-2 serves set A": spike-ai-pipeline's llama.env and host-update are stale; gb10-2 serves from spike-model-engines' engines suite and shared preset.
+- coordinator · ai-hosting.md "gb10-2 serves set A": spike-ai-pipeline's llama.env and host-update are stale; gb10-2 serves from spike-model-engines' engines suite and shared preset, whose 26B-A4B QAT section carries `ub = 1120` and `image-min-tokens = 560` on every host, so "The Framework's set A likely has the same 512 cap" no longer holds.
 - coordinator · intake note (ai-hosting.md, experiment.hosting): gb10-1's descriptor there still says gb10-2 is reserved for spike-ai-pipeline.
 - coordinator · intake note (ai-hosting.md, experiment.hosting): spike-model-engines' llama.cpp setup guide ("GB10, in a container") says gb10-2 is reserved and puts the clone in the home directory, not ~/repos (outside host/).
 - coordinator · intake note (ai-hosting.md, experiment.hosting): spike-ai-pipeline's laptop-side `mise run host-update` fails at its clone pull once the clone is gone; it touches nothing first.
 - coordinator · intake note (ai-hosting.md, experiment.hosting): the Framework holds the same store extras as gb10-1 (its framework task can weigh them).
 - coordinator · intake note (ai-hosting.md, experiment.hosting): gb10-2 has no host descriptor in spike-hosting-upgrades, and this task's within-session spread on gb10-2 (output tok/s: A 2.37%, B 0.52%) is its first run-noise figure; spike-hosting-upgrades' descriptor work can take both.
 - spike-model-engines · intake note: docs outside host/ still name strix-halo's pin as b11960 (context/README.md "Held pins", docs/engines/llama.cpp/README.md:14, update.md:35, setup.md:303 and :591); this spike changes only host/.
+- coordinator · intake note (ai-hosting.md, experiment.hosting, "Gaps in the answer": the vision section's prompt-cache keys still to verify): the shared preset's 26B-A4B QAT and E4B sections set no `cache-ram`, so each process's host prompt cache defaults to 8192 MiB; under vision load it took gb10-1 under its floor, and on the Framework it sits in system memory, outside the GTT floor (spike-model-layout `docs/findings/footprint.md`, sections G and K). Capping it is role-split's pull request to spike-model-engines' `host/`.
+- coordinator · intake note (roadmap.toml, the comment "Inputs to sizing set A's slots"): the vision line's ~477 tokens a page is the model's default image-max-tokens on ggml-org's weights; on the QAT section, `image-min-tokens = 560` and `ub = 1120` put an image at 560 to 1,120 tokens. The audio line's 32,768-token context is the E4B section's total; each of its 4 slots holds 8,192 tokens, under the 10-minute WAV's 15,028 (spike-model-layout `docs/findings/footprint.md`, section I.6; sizing that request is role-split's).

@@ -5,7 +5,7 @@ figure citing its finding under `docs/findings/`. The answer task finalizes it.
 
 ## Hosts
 
-What each host runs and serves. No placement is decided yet: "Serves now" is what the hosts task
+What each host runs and serves. No placement is decided yet: "Serves now" is what the last task
 left loaded, not a layout decision.
 
 | Host | Stack | Engine and preset | Serves now | Parity | Finding |
@@ -21,9 +21,9 @@ Every placement is sized from the capacity table in the
 1,000 tokens and per slot, and its idle, warmed-peak and under-load figures on each host class
 (I.1, I.2); each host's ceiling, floor and base use (I.3); the computed largest c and
 131,072-token sessions above the floor, alone and beside set A (I.4); the 26B-A4B's Vulkan
-constraint (I.5); and input token costs (I.6). Its computed figures assume the Gemma sections'
-`cache-ram` capped at 0; at the preset's default, set A went under a GB10's floor under vision load
-(section G).
+constraint (I.5); and input token costs (I.6). The table's computed figures assume the Gemma
+sections' `cache-ram` capped at 0; at the preset's default, set A went under a GB10's floor under
+vision load (the finding's section G).
 
 | Host class | Set A idle | Set A warmed peak | Floor | Worked placement | Finding |
 | --- | --- | --- | --- | --- | --- |
