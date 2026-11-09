@@ -145,7 +145,7 @@ Door          two-way: the helper and scenarios revert by commit; hosts change o
 
 slices 3/4 committed (slice 1: helper and scenarios 288b73a, gb10-1 measured; slice 2: the Framework measured, serving a fresh set A; slice 3: finding and capacity table 4ba8f9e; step logs .state/measure/<host>/2026-11-09.log) · standards done (67fe8b4) · spec done (6c6a92e, e2b75c0) · editor done
 
-Next: slice 4, the architect's walkthrough.
+Next: slice 4, the architect's walkthrough on gb10-1 (26B-A4B alone load and footprint read, cell footprint-walk-p2a, the I.7 placement read), then BRIEF.
 
 ## Decisions
 
