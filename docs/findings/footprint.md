@@ -935,16 +935,18 @@ export MEASURE_FLOOR_GIB=12.2
 # 18:10:45, refused: the sudoers rule names /usr/sbin/sysctl exactly, so `sudo -n` declines
 # /usr/bin/sysctl (rc 1)
 ssh gb10-1 sudo -n /usr/bin/sysctl vm.drop_caches=3
-# 18:10:57, an interactive shell on gb10-1, where the architect ran
+# 18:10:57, 18:11:51 and 18:13:16: interactive shells on gb10-1, for the cache drops. What ran
+# inside them isn't in the step log; the architect pasted the third, before the last footprint:
+#   gb10-1 ~ ✗ sudo -n /usr/sbin/sysctl vm.drop_caches=3
+#   vm.drop_caches = 3
 ssh gb10-1
-sudo -n /usr/sbin/sysctl vm.drop_caches=3      # vm.drop_caches = 3
 memory                                          # 117.63 GiB available (MemAvailable)
 t0=$(date -u +%FT%TZ)
 load google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0   # loaded in 15.2 s, --ctx-size 32768 --parallel 4
-ssh gb10-1                                      # sudo -n /usr/sbin/sysctl vm.drop_caches=3 there
+ssh gb10-1
 footprint 2026-11-09T23:11:28Z
 cell footprint-walk-p2a footprint-p2a google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0 google/gemma-4-26B-A4B-it
-ssh gb10-1                                      # sudo -n /usr/sbin/sysctl vm.drop_caches=3 there
+ssh gb10-1
 footprint
 unload --all
 ```
