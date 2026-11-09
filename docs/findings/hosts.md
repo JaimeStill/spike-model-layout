@@ -408,18 +408,33 @@ gb10-2  12:08:29  ssh gb10-2 'sudo -n -l 2>&1 | grep drop_caches || echo "gb10-2
 
 ### Commands not in a step log
 
-The alignment steps in section D ran before 11:45, outside the step helpers. Their records hold
-the outcome, and the store clear and drift removal their commands (quoted above as run), but not
-every command line. These steps are named here by what they ran; PENDING: the session completes
-each with its full command line as run.
+The stack read and the alignment steps in section D ran from the laptop, outside the step helpers,
+from this project's root. As run, in order (output went to the session and, where named, to
+`.state/hosts/`):
 
-- gb10-1: `docker restart llama`.
-- Both GB10s, in `~/repos/spike-model-engines`: `MISE_ENV=host mise install`, `mise upgrade gh`,
-  `mise prune -y`.
-- gb10-2: the spike-model-engines clone and its `hosts` branch, `host/engines llama update`, and
-  the removal of the spike-ai-pipeline clone, its mise trust, golangci-lint 2.15.0 and
-  `~/qat-download.log`.
-- The stack read and `tailscale ping -c 1` behind `.state/hosts/stack-2026-11-09.txt`.
+```sh
+# the stack read and the ping (.state/hosts/stack-2026-11-09.txt)
+for h in gb10-1 gb10-2; do echo "== $h"; timeout 60 ssh -o BatchMode=yes $h 'apt list --upgradable 2>/dev/null | grep -vc "^Listing"; uname -r; nvidia-smi --query-gpu=driver_version --format=csv,noheader; nvidia-smi | grep -o "CUDA Version: [0-9.]*"; docker --version; nvidia-ctk --version | head -1; . /etc/os-release; echo $PRETTY_NAME; cat /etc/dgx-release 2>/dev/null | grep -i version | head -2; docker ps --format "{{.Names}} {{.Image}} {{.Status}}"'; done; echo "== framework"; timeout 60 ssh -o BatchMode=yes framework 'checkupdates 2>/dev/null | wc -l; uname -r; pacman -Q mesa docker 2>/dev/null; docker ps --format "{{.Names}} {{.Image}} {{.Status}}"'; for h in gb10-1 gb10-2 framework; do tailscale ping -c 1 $h; done
+
+# gb10-2's clone, and the hosts branch on both GB10s
+ssh gb10-2 'cd ~/repos && git clone -q https://github.com/JaimeStill/spike-model-engines.git && cd spike-model-engines && git log --oneline -1 && git status -sb | head -1'
+for h in gb10-1 gb10-2; do git -C ~/experiments/spike-model-engines push $h:repos/spike-model-engines hosts:hosts-next 2>&1 | tail -1; ssh $h 'cd ~/repos/spike-model-engines && git switch -c hosts hosts-next 2>&1 | tail -1 && git log --oneline -1'; done
+
+# gb10-2's preset mount moved, gb10-1's router restarted on the hosts preset
+ssh gb10-2 'cd ~/repos/spike-model-engines && host/engines llama update; echo "exit $?"' 2>&1 | tee .state/hosts/align/gb10-2-update.log; for i in $(seq 1 60); do curl -sf http://gb10-2:8080/health >/dev/null && break; sleep 3; done; curl -s http://gb10-2:8080/health; echo; ssh gb10-1 'docker restart llama' ; for i in $(seq 1 60); do curl -sf http://gb10-1:8080/health >/dev/null && break; sleep 3; done; curl -s http://gb10-1:8080/health; echo
+
+# spike-ai-pipeline's leftovers on gb10-2
+ssh gb10-2 'set -x; mise trust --untrust ~/repos/spike-ai-pipeline; rm -rf ~/repos/spike-ai-pipeline; mise uninstall golangci-lint@2.15.0; rm ~/qat-download.log; set +x; ls ~/repos; ls ~/.local/state/mise/trusted-configs/; mise ls | grep -c golangci' 2>&1
+
+# the engines host tools on both GB10s, gh, and the prune (the prune and gb10-2's gh in ~)
+for h in gb10-1 gb10-2; do echo "== $h"; ssh $h 'cd ~/repos/spike-model-engines && MISE_ENV=host mise install 2>&1 | tail -3; [ "$(hostname)" = gb10-1 ] && mise upgrade gh 2>&1 | tail -2; MISE_ENV=host mise ls --current 2>/dev/null; mise ls gh 2>/dev/null' ; done
+ssh gb10-2 'mise upgrade gh 2>&1 | tail -1'; for h in gb10-1 gb10-2; do echo "== $h"; ssh $h 'cd ~ && mise prune --dry-run 2>&1 | tail -8'; done
+for h in gb10-1 gb10-2; do echo "== $h"; ssh $h 'cd ~ && mise prune -y 2>&1 | grep -E "uninstall$|is prunable" ; mise ls gh uv pipx:huggingface_hub 2>/dev/null'; done
+```
+
+`mise upgrade gh` moved gb10-1 from 2.102.1 and gb10-2 from 2.103.0 to 2.103.3, then the latest;
+the prune removed uv 0.13.5 and 0.13.6 on both. The golangci-lint check's exit 1 is `grep -c`
+counting none.
 
 ## F. Carried forward
 
