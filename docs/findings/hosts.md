@@ -342,7 +342,10 @@ gpt-oss in 44.7 s. gb10-1 has nothing loaded. On a GB10 the set-A gpt-oss sectio
 ### Commands as run (gb10-1 and gb10-2)
 
 From `.state/measure/gb10-1/2026-11-09.log` and `.state/measure/gb10-2/2026-11-09.log`, merged
-in time order; filters and helper internals left out as in section C.
+in time order; filters and helper internals left out as in section C. The list is rebuilt from
+the logs' xtrace lines, one helper call a line, so a typed pipeline shows as its parts and a call
+inside `$( )` as the bare call; the clearing step, for one, was typed as
+`(source scripts/measure-lib.sh gb10-1 2>/dev/null; unload --all >/dev/null; echo "gb10-1: $(loaded)") ; (source scripts/measure-lib.sh gb10-2 2>/dev/null; unload --all >/dev/null; echo "gb10-2: $(loaded)")`.
 
 ```
 gb10-2  11:45:39  loaded
@@ -360,8 +363,10 @@ gb10-1  11:47:15  curl -s http://gb10-1:8080/models
 gb10-1  11:47:15  unload google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0
 gb10-1  11:47:19  loaded
 gb10-1  11:47:19  ssh gb10-2 'sudo -n -l 2>&1 | grep drop_caches || echo "gb10-2: no drop_caches rule yet"'
-both    11:47:34  unload --all
-both    11:47:34  loaded
+gb10-1  11:47:34  unload --all
+gb10-1  11:47:34  loaded
+gb10-2  11:47:34  unload --all
+gb10-2  11:47:49  loaded
 gb10-1  11:47:52  load gpt-oss-120b-MXFP4-set-a
 gb10-1  11:48:37  MEASURE_FLOOR_GIB=12.2
 gb10-1  11:48:37  cell hosts-par-r5-gb10-1-a anchor-a gpt-oss-120b-MXFP4-set-a openai/gpt-oss-120b
@@ -409,7 +414,7 @@ gb10-2  12:08:29  ssh gb10-2 'sudo -n -l 2>&1 | grep drop_caches || echo "gb10-2
 ### Commands not in a step log
 
 The stack read and the alignment steps in section D ran from the laptop, outside the step helpers,
-from this project's root. As run, in order (output went to the session and, where named, to
+from this project's root. As run, grouped by step (output went to the session and, where named, to
 `.state/hosts/`):
 
 ```sh
@@ -430,6 +435,28 @@ ssh gb10-2 'set -x; mise trust --untrust ~/repos/spike-ai-pipeline; rm -rf ~/rep
 for h in gb10-1 gb10-2; do echo "== $h"; ssh $h 'cd ~/repos/spike-model-engines && MISE_ENV=host mise install 2>&1 | tail -3; [ "$(hostname)" = gb10-1 ] && mise upgrade gh 2>&1 | tail -2; MISE_ENV=host mise ls --current 2>/dev/null; mise ls gh 2>/dev/null' ; done
 ssh gb10-2 'mise upgrade gh 2>&1 | tail -1'; for h in gb10-1 gb10-2; do echo "== $h"; ssh $h 'cd ~ && mise prune --dry-run 2>&1 | tail -8'; done
 for h in gb10-1 gb10-2; do echo "== $h"; ssh $h 'cd ~ && mise prune -y 2>&1 | grep -E "uninstall$|is prunable" ; mise ls gh uv pipx:huggingface_hub 2>/dev/null'; done
+
+# the before state, and the two files quoted before removal (.state/hosts/align/)
+for h in gb10-1 gb10-2; do ssh $h 'docker inspect llama' > .state/hosts/align/$h-inspect-before.json; ssh $h 'ls -A ~ | sort' > .state/hosts/align/$h-home-before.txt; ssh $h 'ls -A ~/repos; ls /srv/models' > .state/hosts/align/$h-repos-store-before.txt; done; ssh gb10-2 'cat ~/qat-download.log' > .state/hosts/align/gb10-2-qat-download.log; ssh gb10-1 'for f in ~/bench/*; do echo "=== $f"; cat "$f"; done' > .state/hosts/align/gb10-1-bench.txt; wc -l .state/hosts/align/*; diff .state/hosts/align/gb10-1-home-before.txt .state/hosts/align/gb10-2-home-before.txt; cat .state/hosts/align/*repos-store-before.txt
+ssh gb10-1 'ls -la ~/.humming; file ~/.humming/* 2>/dev/null | head; du -sh ~/.humming'
+
+# gb10-1's store: listed, then the four repositories outside set A removed
+ssh gb10-1 'cd ~/repos/spike-model-engines && export MISE_ENV=host HF_HUB_CACHE=/srv/models; mise exec -- hf cache --help 2>&1 | sed -n 1,25p; mise exec -- hf cache ls 2>&1 | head -20'
+ssh gb10-1 'cd ~/repos/spike-model-engines && export MISE_ENV=host HF_HUB_CACHE=/srv/models; set -x; mise exec -- hf cache rm -y model/google/gemma-4-12B-it-qat-q4_0-gguf model/google/gemma-4-31B-it-qat-q4_0-gguf model/google/gemma-4-E4B-it-qat-q4_0-gguf model/ibm-granite/granite-embedding-english-r2 2>&1 | grep -v Hint; set +x; ls /srv/models; df -h /srv/models | tail -1' 2>&1 | tee .state/hosts/align/gb10-1-store-clear.log
+
+# gb10-1's drift: compared, then removed
+diff <(ssh gb10-1 cat ~/.bashrc) <(ssh gb10-2 cat ~/.bashrc); ssh gb10-1 'sed -n 110,130p ~/.bashrc'; grep -rn "local/bin" ~/dotfiles/platforms/dgx/*.sh ~/dotfiles/shell/env.sh 2>/dev/null | head -5
+ssh gb10-2 'bash -ic "echo \$PATH" 2>/dev/null | tr : "\n" | grep -n local/bin'; grep -rn "local/bin" ~/dotfiles/platforms/dgx/bashrc ~/dotfiles/shell 2>/dev/null | head -3
+diff <(ssh gb10-1 'ls -A ~/.config | sort') <(ssh gb10-2 'ls -A ~/.config | sort'); diff <(ssh gb10-1 'ls -A ~/.local/share ~/.cache 2>/dev/null') <(ssh gb10-2 'ls -A ~/.local/share ~/.cache 2>/dev/null')
+ssh gb10-1 'ls -laR ~/.config/NVIDIA | head -15; du -sh ~/.config/NVIDIA'
+ssh gb10-1 'set -x
+rm -rf ~/.config/gh ~/.config/byobu ~/.config/nvidia-ai-workbench ~/.config/NVIDIA ~/.config/vllm ~/.nvwb ~/.nv ~/.tilelang ~/.humming ~/bench
+sed -i -e "/#byobu-prompt#\$/d" -e "/^# PATH config\$/,/^export PATH=\"\$HOME\/.local\/bin:\$PATH\"\$/d" ~/.bashrc
+set +x' 2>&1 | tee .state/hosts/align/gb10-1-drift.log; diff <(ssh gb10-1 cat ~/.bashrc) <(ssh gb10-2 cat ~/.bashrc) && echo "bashrc identical"; diff <(ssh gb10-1 'ls -A ~ | sort') <(ssh gb10-2 'ls -A ~ | sort'); ssh gb10-1 'bash -ic "echo \$PATH" 2>/dev/null | tr : "\n" | grep -c local/bin'
+ssh gb10-1 'sed -n 117,121p ~/.bashrc | cat -A | head -5'; ssh gb10-1 'set -x; sed -i "120{/^\$/d}" ~/.bashrc; set +x' 2>&1 | tee -a .state/hosts/align/gb10-1-drift.log; diff <(ssh gb10-1 cat ~/.bashrc) <(ssh gb10-2 cat ~/.bashrc) && echo "bashrc identical"
+
+# the containers compared after (.state/hosts/align/*-inspect-after.json)
+for h in gb10-1 gb10-2; do ssh $h 'docker inspect llama' | jq '.[0] | {Image: .Config.Image, Cmd: .Config.Cmd, Entrypoint: .Config.Entrypoint, Env: .Config.Env, Healthcheck: .Config.Healthcheck, User: .Config.User, Restart: .HostConfig.RestartPolicy, Network: .HostConfig.NetworkMode, Ports: .HostConfig.PortBindings, DeviceRequests: .HostConfig.DeviceRequests, Devices: .HostConfig.Devices, Log: .HostConfig.LogConfig, Mounts: [.Mounts[] | {Type, Source, Destination, RW}], ShmSize: .HostConfig.ShmSize, Ulimits: .HostConfig.Ulimits}' > .state/hosts/align/$h-inspect-after.json; done; diff .state/hosts/align/gb10-1-inspect-after.json .state/hosts/align/gb10-2-inspect-after.json | sed -E 's/100\.[0-9]+\.[0-9]+\.[0-9]+/<tailnet address>/g'
 ```
 
 `mise upgrade gh` moved gb10-1 from 2.102.1 and gb10-2 from 2.103.0 to 2.103.3, then the latest;
