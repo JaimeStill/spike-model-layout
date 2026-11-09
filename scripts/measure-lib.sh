@@ -20,8 +20,8 @@
 #
 # MEASURE_LOG=off, set for the `source` line, sources the helpers read-only: no log, no xtrace,
 # nothing appended, for reading a finished run (`summarize`, `loaded`, `memory`, `readout`,
-# `routing`, `image`) without adding to the day's log. The helpers that load the host (load,
-# unload, watch, cell, gate) refuse there.
+# `footprint`, `routing`, `image`) without adding to the day's log. The helpers that load the host
+# (load, unload, watch, cell, gate) refuse there.
 #
 # No helper runs a benchmark on its own or chains cells: `cell` runs one GuideLLM scenario under
 # `watch`, and `gate` only loads and unloads.
@@ -37,6 +37,8 @@
 #   routing                         rules.md's routing check: the host's .lan records, what the bare
 #                                   name resolves to, and 50 connects to the router's /health
 #   readout [<since>]               the router's log since a time (default 5 minutes ago), and memory
+#   footprint [<since>]             each llama-server's GPU memory and RSS by alias, the pool, and
+#                                   the load lines that size its buffers (default 10 minutes ago)
 #   watch <name> <command...>       run one command with GPU clocks and memory sampled, readouts
 #                                   at an interval, and the run stopped under the memory floor
 #   image <class> <build>           whether the class's engine image exists for a build (ghcr.io)
@@ -280,6 +282,80 @@ readout() {
             else print "replies >=90 tokens: none" }'
   rm -f "$log"
   memory
+}
+
+# What each loaded model holds, the pool they share, and what their loads allocated, in three
+# parts, read on the host in one ssh call:
+#   1. one line a llama-server process, named by its --alias (the router's own process, which has
+#      none, is `router`): its pid, its resident set from ps, and its GPU memory, nvidia-smi's
+#      used_memory on a GB10 or amdgpu_top's VRAM and GTT on a Strix Halo. Both report host pids,
+#      the ones ps gives (read on gb10-2 and framework with set A loaded), so they join on the pid.
+#   2. the pool: MemTotal, MemAvailable and Cached on a GB10, whose GPU allocates from system
+#      memory; GTT used and total on a Strix Halo, from amdgpu's sysfs.
+#   3. the router's log since <since>: each child's load lines that size an allocation (weights,
+#      KV, compute and output buffers, the KV cache's cells and layers, the multimodal projector,
+#      the slots and their context), each under the router's line that spawned it. The router
+#      prefixes a child's lines with its [port], which this names by the section that spawning
+#      line gives the port, by the live child's alias for a spawn before <since>, or else
+#      `port <n> (gone)`.
+footprint() {
+  case $-:${_measure_marking-} in
+    *x*:) _measure_marked footprint "$@"; return ;;
+    *:on) _measure_marking=in; set -x ;;
+  esac
+  local since=${1:-$(date -u -d '-10 min' +%FT%TZ)}
+  # The script runs on the host, its expansions unexpanded here (the quoted here-document); its
+  # two arguments, the time and the container, are expanded here and quoted for the host's shell.
+  # shellcheck disable=SC2029
+  ssh "$MEASURE_HOST" "bash -s -- $(printf '%q ' "$since" "${MEASURE_CONTAINER:-llama}")" <<'EOF'
+since=$1 container=$2
+# pid, RSS KiB, port and alias of every llama-server process.
+procs=$(ps -eo pid=,rss=,args= | awk '$3 ~ /(^|\/)llama-server$/ {
+  a = "router"; p = "-"
+  for (i = 4; i < NF; i++) { if ($i == "--alias") a = $(i + 1); if ($i == "--port") p = $(i + 1) }
+  print $1, $2, p, a }')
+card=
+for d in /sys/class/drm/card*/device; do
+  [ -r "$d/mem_info_gtt_total" ] && { card=$d; break; }
+done
+if command -v nvidia-smi >/dev/null; then
+  kind=nvidia
+  gpu=$(nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader,nounits | tr -d ' ' | tr , ' ')
+elif [ -n "$card" ] && command -v amdgpu_top >/dev/null; then
+  kind=amdgpu
+  # amdgpu_top -p prints a process as `<name> (<pid>), ctxs <n>, VRAM <n> MiB (<pct>), GTT ...`.
+  gpu=$(timeout 30 amdgpu_top -p 2>/dev/null |
+    sed -nE 's/.*\( *([0-9]+)\), ctxs +[0-9]+, VRAM +([0-9]+) MiB.*GTT +([0-9]+) MiB.*/\1 \2 \3/p')
+else
+  kind=none gpu=
+fi
+echo "processes ($kind):"
+awk -v kind="$kind" 'NR == FNR { v[$1] = $2; g[$1] = $3; next }
+  { if (kind == "nvidia") m = ($1 in v) ? sprintf("gpu %d MiB", v[$1]) : "gpu none"
+    else if (kind == "amdgpu") m = ($1 in v) ? sprintf("vram %d MiB, gtt %d MiB", v[$1], g[$1]) : "vram none, gtt none"
+    else m = "no GPU read"
+    printf "  %s: pid %s, %s, rss %d MiB\n", $4, $1, m, $2 / 1024 }' \
+  <(printf '%s\n' "$gpu") <(printf '%s\n' "$procs")
+if [ "$kind" = amdgpu ]; then
+  awk -v u="$(cat "$card/mem_info_gtt_used")" -v t="$(cat "$card/mem_info_gtt_total")" \
+    'BEGIN { printf "pool: GTT used %.2f GiB of %.2f GiB\n", u / 2^30, t / 2^30 }'
+else
+  awk '/^(MemTotal|MemAvailable|Cached):/ { m[$1] = $2 / 2^20 }
+    END { printf "pool: MemTotal %.2f GiB, MemAvailable %.2f GiB, Cached %.2f GiB\n", m["MemTotal:"], m["MemAvailable:"], m["Cached:"] }' /proc/meminfo
+fi
+echo "load lines since $since:"
+docker logs --since "$since" "$container" 2>&1 |
+  grep -E 'spawning server instance with name=|buffer size|llama_kv_cache: size =|initializing, n_slots|load_hparams: +(projector|model size)|memory usage of mmproj' |
+  awk 'NR == FNR { if ($3 != "-") a[$3] = $4; next }
+    match($0, /with name=[^ ]+ on port [0-9]+/) {
+      n = split(substr($0, RSTART + 10, RLENGTH - 10), w, " "); a[w[n]] = w[1] }
+    { who = "router"
+      if (match($0, /^\[[0-9]+\] [0-9.]+ [A-Z] /)) {
+        p = substr($0, 2, index($0, "]") - 2); $0 = substr($0, RLENGTH + 1)
+        who = (p in a) ? a[p] : "port " p " (gone)" }
+      else sub(/^[0-9.]+ [A-Z] /, "")
+      gsub(/ +/, " "); print "  " who ": " $0 }' <(printf '%s\n' "$procs") -
+EOF
 }
 
 # Kills a process and every descendant, deepest first.

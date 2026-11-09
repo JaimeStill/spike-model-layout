@@ -1,0 +1,36 @@
+# Footprint cell P2b: gemma-4-26B-A4B QAT, 1 stream sending 1 request of two synthetic 1440p JPEGs
+# (2560 x 1440, GuideLLM's default gradient at quality 85, the two different) beside 200
+# synthetic text tokens, and exactly 64 output tokens: the peak two large images in one request
+# add over the loaded model. P2a's scenario with a second image source (footprint-p2a.yaml says
+# why P2 is three scenarios). Adapted from spike-model-engines' bench/vision-b.yaml. It needs
+# GuideLLM's vision extra, which mise.bench.toml installs. Engine-neutral: the section and its
+# tokenizer (google/gemma-4-26B-A4B-it) are given on the command line, as `cell`'s <section>
+# <tokenizer>, the JSON's path by `cell`, and the target in GUIDELLM__SPEC__BACKEND__TARGET. Run
+# from the repository root.
+spec:
+  backend:
+    kind: openai_http
+    request_format: /v1/chat/completions
+  profile:
+    kind: concurrent
+    streams: 1
+  # Three sources read side by side, one row of each the request. GuideLLM's column mapper puts
+  # each source's `image` column in the same turn, so both images go in one message; a single
+  # source's images_per_request would name them image_0 and image_1, which the mapper reads as two
+  # turns. The second source's seed differs from the first's default (42), so the two images do,
+  # and only the first carries the output tokens, so the request has one count: 64, sent as
+  # max_completion_tokens with ignore_eos.
+  data:
+    - kind: synthetic_text
+      prompt_tokens: 200
+    - kind: synthetic_image
+      resolution: 1440p
+      format: jpeg
+      output_tokens: 64
+    - kind: synthetic_image
+      resolution: 1440p
+      format: jpeg
+      seed: 43
+  constraints:
+    - kind: max_requests
+      count: 1

@@ -1,0 +1,23 @@
+# Footprint cell P1: gpt-oss-120b, 1 stream sending 1 request of 100,000 synthetic prompt tokens
+# and exactly 256 output tokens: one slot filled near its context, to read the peak a single long
+# prompt adds over the loaded model (footprint). Adapted from spike-hosting-upgrades'
+# bench/long-b.yaml, at 1 stream and 1 request. Engine-neutral: the section and its tokenizer
+# (openai/gpt-oss-120b) are given on the command line, as `cell`'s <section> <tokenizer>, the JSON's
+# path by `cell`, and the target in GUIDELLM__SPEC__BACKEND__TARGET. A section must give the slot
+# more than 100,256 tokens and the model's chat template. GuideLLM sends max_completion_tokens
+# with ignore_eos whenever output_tokens is set, so the request generates its full 256. Run from
+# the repository root.
+spec:
+  backend:
+    kind: openai_http
+    request_format: /v1/chat/completions
+  profile:
+    kind: concurrent
+    streams: 1
+  data:
+    - kind: synthetic_text
+      prompt_tokens: 100000
+      output_tokens: 256
+  constraints:
+    - kind: max_requests
+      count: 1

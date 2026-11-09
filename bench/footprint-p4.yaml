@@ -1,0 +1,20 @@
+# Footprint cell P4: granite-embedding-english-r2, 1 stream sending 1 request of 8,000 synthetic
+# tokens to /v1/embeddings: an input near the section's 8,192-token slot, the peak one long
+# embedding adds over the loaded model. Adapted from spike-model-engines' bench/embed.yaml, at
+# 1 stream and 1 request. An embedding has no output tokens, streaming, TTFT, or ITL.
+# Engine-neutral: the section and its tokenizer (ibm-granite/granite-embedding-english-r2) are
+# given on the command line, as `cell`'s <section> <tokenizer>, the JSON's path by `cell`, and the
+# target in GUIDELLM__SPEC__BACKEND__TARGET. Run from the repository root.
+spec:
+  backend:
+    kind: openai_http
+    request_format: /v1/embeddings
+  profile:
+    kind: concurrent
+    streams: 1
+  data:
+    - kind: synthetic_text
+      prompt_tokens: 8000
+  constraints:
+    - kind: max_requests
+      count: 1
