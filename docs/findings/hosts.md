@@ -5,7 +5,7 @@ stack and network path below, on that day, and nothing after it.
 
 **What it establishes.** Evidence 1, host parity: with both GB10s on the same stack, engine and
 preset, gb10-2's output throughput and inter-token latency on anchors A and B sit within run noise
-of gb10-1's, so cells measured on either GB10 compare. On the way: all three hosts were brought
+of gb10-1's, so cells measured on either GB10 compare. Along the way, all three hosts were brought
 current, the Framework moved from llama.cpp b11960 to b12098 without a regression, and gb10-2 left
 spike-ai-pipeline's clone for spike-model-engines' engines suite, aligned to gb10-1.
 
@@ -17,7 +17,7 @@ spike-ai-pipeline's clone for spike-model-engines' engines suite, aligned to gb1
 
 ## Stack, engine and network path
 
-Read after the root updates (`.state/hosts/stack-2026-11-09.txt`; the session, read-only SSH):
+Read by the session over SSH, read-only, after the root updates (`.state/hosts/stack-2026-11-09.txt`):
 
 | Host | OS | Kernel | GPU stack | Docker | Engine |
 | --- | --- | --- | --- | --- | --- |
@@ -53,8 +53,8 @@ omarchy update
 - **gb10-1 and gb10-2:** 6 packages upgraded on each, same versions: libfreerdp-server3-3,
   libfreerdp3-3 and libwinpr3-3 3.32.1 → 3.32.2+dfsg-0ubuntu0.24.04.1; libnfs14
   5.0.2-1ubuntu0.24.04.1 → .2; openjdk-8-jre and openjdk-8-jre-headless 8u504 → 8u512-b09. The
-  plan round had counted 4; the two openjdk-8 packages arrived since. On gb10-2 the upgrade
-  removed kernel 7.0.0-1019-nvidia's packages and autoremove its headers and tools (7.0.0-1025,
+  plan round had counted 4; the two openjdk-8 packages had arrived since. On gb10-2 the upgrade
+  removed kernel 7.0.0-1019-nvidia's packages and autoremove removed its headers and tools (7.0.0-1025,
   7.0.0-1024 and 6.17.0-1008 remain); gb10-1's autoremove removed nothing. No reboot required on
   either (`exit 1`). `generate-cdi.sh` regenerated the CDI spec on both (driver 580.178.04, CDI
   0.7.0).
@@ -289,9 +289,9 @@ Each table's header rows are omitted above; the record holds them.
 differ only in `.lesshst` and `.viminfo`, and the router containers' settings (the after-inspects
 in `.state/hosts/align/`) differ only in the tailnet address each binds. Over the whole inspect
 output, with the per-container fields removed, one more field differs without effect:
-`HostConfig.Dns` is `[]` on gb10-1 and `null` on gb10-2, neither setting a DNS server. Deeper per-host app state
-(dconf, btop, eog, gtk-4.0, yelp, the pnpm and fastfetch caches, and gb10-2's lazygit) is left as
-each host's own use.
+`HostConfig.Dns` is `[]` on gb10-1 and `null` on gb10-2, and neither sets a DNS server. Deeper
+per-host app state (dconf, btop, eog, gtk-4.0, yelp, the pnpm and fastfetch caches, and gb10-2's
+lazygit) is left as each host's own use.
 
 **Pending, the architect's root step:** gb10-2 has no drop-caches sudoers rule yet. The architect
 was given:
@@ -350,7 +350,7 @@ and 78.06 tok/s.
 
 **After.** gb10-2 serves set A: granite loaded in 3.6 s, E4B in 10.0 s, 26B-A4B in 13.3 s,
 gpt-oss in 44.7 s. gb10-1 has nothing loaded. On a GB10 the set-A gpt-oss section loads in about
-44–48 s (every load in this section).
+44–48 s (every load in section E).
 
 ### Commands as run (gb10-1 and gb10-2)
 
@@ -476,12 +476,12 @@ for h in gb10-1 gb10-2; do ssh $h 'docker inspect llama' | jq '.[0] | {Image: .C
 the prune removed uv 0.13.5 and 0.13.6 on both. The golangci-lint check's exit 1 is `grep -c`
 counting none.
 
-## F. Carried forward
+## F. Open items for later tasks
 
 - gb10-2 has no host descriptor and no run-noise figure in spike-hosting-upgrades. This session's
   within-session spread on gb10-2 (A 2.37%, B 0.52% output tok/s) is the first.
 - gb10-2's drop-caches sudoers rule, pending above.
-- The spike-model-engines `hosts` branch is published as a pull request, and merged, when the
+- The spike-model-engines `hosts` branch is published as a pull request and merged when the
   architect accepts this task's session brief; until then commit 3b60fa4 lives on the laptop's
   branch and on each host's local `hosts` branch, pushed to the hosts over SSH. Each host's clone
   returns to `main` once it merges.

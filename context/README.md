@@ -73,8 +73,8 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
 
 ## Capabilities
 
-- **Host bring-up:** gb10-2 joined to the experiment on the shared engines suite and preset, and
-  the host-parity cells.
+- **Host bring-up:** all three hosts serve from spike-model-engines' engines suite and shared
+  preset, and cells on gb10-1 and gb10-2 compare, [`docs/findings/hosts.md`](../docs/findings/hosts.md).
 - **The footprint table:** memory per model per host class, `docs/findings/footprint.md`.
 - **Measured sessions and requests** per placed model, at its context.
 - **The full-set and role-split comparison** across the two GB10s.
@@ -83,8 +83,9 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
 - **On-demand serving** through llama.cpp's router.
 - **Two-node serving** over QSFP with vLLM and Ray.
 - **The layout document:** [`docs/layout.md`](../docs/layout.md), living, finalized by the answer.
-- **The step helpers:** `scripts/measure-lib.sh`, copied from spike-hosting-upgrades, sourced and
-  called one step at a time, logging every command to `.state/`.
+- **The step helpers:** `scripts/measure-lib.sh`, adapted from spike-hosting-upgrades' without its
+  tier and conform helpers, sourced and called one step at a time, logging every command to this
+  spike's `.state/measure/<host>/`.
 
 ## Path
 

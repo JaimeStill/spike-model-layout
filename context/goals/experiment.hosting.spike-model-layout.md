@@ -112,11 +112,10 @@ Door          two-way: pins and preset revert by pull request; the container is
 
 ## Progress
 
-slices 1/4 committed · standards — · spec — · editor —
+slices 3/4 committed (slice 4 is the architect's walkthrough, after the session brief) · standards done (ce2fa1f, 8454a41) · spec done (3 gaps closed in e2587f3) · editor done
 
-slice 1 done 2026-11-09: repo changes (spike-model-engines 3b60fa4, spike-model-layout a3f6f47); root updates by the architect on all three hosts, none needing a reboot (.state/hosts/root-updates.md); stack and ping read (.state/hosts/stack-2026-11-09.txt). Framework R1-R4 (.state/measure/framework/2026-11-09.log): b11960 A 44.23, B 71.25 tok/s; b12098 A 43.90, B 70.72 tok/s (-0.75%, inside 1.1%). The first `engines llama update` ran without LLAMA_FLAVOR and moved the Framework to server-rocm-b12098; rerun with LLAMA_FLAVOR=vulkan put it on server-vulkan-b12098 before R3 (.state/hosts/framework-update.log). Framework serves set A at b12098 with the three vision keys. The Framework's engines clone is on local branch `hosts` (pushed as `hosts-next`); after SHIP merges, return it to main and delete `hosts`/`hosts-next`.
-slice 2 done 2026-11-09 except the architect's sudoers step on gb10-2 (pending): gb10-2 cloned spike-model-engines at ~/repos; both GB10 clones on local branch `hosts` (pushed as `hosts-next`; return to main after SHIP merges); gb10-2 `engines llama update` moved the preset mount (same b12098 image); gb10-1 router restarted on the `hosts` preset; gb10-2 lost the spike-ai-pipeline clone, its mise trust, golangci-lint 2.15.0, ~/qat-download.log (quoted in .state/hosts/align/); both GB10s: MISE_ENV=host mise install (uv 0.13.7, hf 2.4.0), gh 2.103.3, mise prune (uv 0.13.5, 0.13.6); gb10-1 store extras cleared with hf cache rm (32.5G); gb10-1 drift removed (gh login, byobu config and line, PATH line, AI Workbench ~/.nvwb ~/.config/NVIDIA ~/.config/nvidia-ai-workbench, vLLM ~/.config/vllm ~/.tilelang ~/.humming, ~/.nv, ~/bench quoted first); .bashrc identical; homes differ only in .lesshst and .viminfo; containers differ only in the tailnet address; set A loads on gb10-2 with the three keys, and gb10-1's 26B-A4B shows them. Deeper app state (dconf, btop, eog, gtk-4.0, yelp, pnpm/fastfetch caches; gb10-2's lazygit) left as each host's own use.
-next: slice 3 (parity cells R5-R12, then docs).
+- Engines clones: gb10-1's, gb10-2's and the Framework's spike-model-engines clones are on local branch `hosts` at 3b60fa4, pushed as `hosts-next`. After SHIP merges the engines pull request, each host runs `git switch main && git pull --ff-only && git branch -D hosts hosts-next`, and its router is restarted only if the merge changed the preset.
+- gb10-2's drop-caches sudoers rule is pending the architect (Behavior 8).
 
 ## Decisions
 
@@ -149,14 +148,20 @@ next: slice 3 (parity cells R5-R12, then docs).
 - hosts: gb10-2 aligned only to what dotfiles and the engines suite set up; gb10-1's drift outside them removed (the architect).
 - hosts: gb10-1's store extras (12B, 31B, E4B QAT GGUFs; granite safetensors; 32.45 GB) cleared: nothing this spike or a planned goal runs reads them, and each task downloads what it serves.
 - hosts: measure-lib.sh drops tier and conform and fixes MEASURE_ROOT.
+- hosts (BUILD): host/ changes reach the hosts before merge by `git push <host>:repos/spike-model-engines hosts:hosts-next` and a local `hosts` branch on each host (spike-hosting-upgrades' precedent), never through GitHub before the architect accepts the session brief.
+- hosts (BUILD): the Framework's `engines llama update` needs `LLAMA_FLAVOR=vulkan`, because the script defaults an AMD GPU to rocm. A first run without it moved the Framework to server-rocm-b12098 and removed the vulkan b11960 image; the rerun with the flag corrected it before R3.
+- hosts (BUILD): `LLAMA_RELEASE=v0.8.0` stays in host/llama.env as a record. Neither host class runs it, and removing it would change llama-release.sh's message and docs outside host/.
+- hosts (BUILD): parity's session spread is taken from output tok/s for both measures. ITL's own spread is wider, so the verdict holds either way.
+- hosts (BUILD): gb10-1's deeper app state (dconf, btop, eog, gtk-4.0, yelp, the pnpm and fastfetch caches) and gb10-2's lazygit stay as each host's own use, not drift. ~/.humming and ~/.config/NVIDIA counted as vLLM and AI Workbench leftovers and were removed.
+- hosts (BUILD): gb10-2 uses gb10-1's memory floor of 12.2 GiB: the hardware is the same, and gb10-2 has no host descriptor.
 
 ## Pending edits
 
 - coordinator · ai-hosting.md "Hosts and access": the drop-caches rule on both GB10s.
 - coordinator · ai-hosting.md "gb10-2 serves set A": spike-ai-pipeline's llama.env and host-update are stale; gb10-2 serves from spike-model-engines' engines suite and shared preset.
-- coordinator · intake note (ai-hosting.md, experiment.hosting): spike-hosting-upgrades has no host descriptor or run noise for gb10-2.
 - coordinator · intake note (ai-hosting.md, experiment.hosting): gb10-1's descriptor there still says gb10-2 is reserved for spike-ai-pipeline.
 - coordinator · intake note (ai-hosting.md, experiment.hosting): spike-model-engines' llama.cpp setup guide ("GB10, in a container") says gb10-2 is reserved and puts the clone in the home directory, not ~/repos (outside host/).
 - coordinator · intake note (ai-hosting.md, experiment.hosting): spike-ai-pipeline's laptop-side `mise run host-update` fails at its clone pull once the clone is gone; it touches nothing first.
-- coordinator · intake note (ai-hosting.md, experiment.hosting): The Framework holds the same store extras as gb10-1 (its framework task can weigh them).
+- coordinator · intake note (ai-hosting.md, experiment.hosting): the Framework holds the same store extras as gb10-1 (its framework task can weigh them).
+- coordinator · intake note (ai-hosting.md, experiment.hosting): gb10-2 has no host descriptor in spike-hosting-upgrades, and this task's within-session spread on gb10-2 (output tok/s: A 2.37%, B 0.52%) is its first run-noise figure; spike-hosting-upgrades' descriptor work can take both.
 - spike-model-engines · intake note: docs outside host/ still name strix-halo's pin as b11960 (context/README.md "Held pins", docs/engines/llama.cpp/README.md:14, update.md:35, setup.md:303 and :591); this spike changes only host/.
