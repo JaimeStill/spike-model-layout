@@ -25,7 +25,7 @@ constraint (I.5); and input token costs (I.6). Its computed figures assume the G
 `cache-ram` capped at 0; at the preset's default, set A went under a GB10's floor under vision load
 (section G).
 
-| Host class | Set A idle | Set A warmed peak | Floor | Worked placement |
-| --- | --- | --- | --- | --- |
-| GB10 | 21.45 GiB available | 17.23 GiB | 12.2 GiB | agent-only: 9 sessions of 131,072 tokens (I.7) |
-| Framework | 19.08 GiB available (GTT) | 18.08 GiB | 11.2 GiB | none yet |
+| Host class | Set A idle | Set A warmed peak | Floor | Worked placement | Finding |
+| --- | --- | --- | --- | --- | --- |
+| GB10 | 21.45 GiB available | 17.23 GiB | 12.2 GiB | agent-only: 9 sessions of 131,072 tokens | [footprint](findings/footprint.md): I.3, I.7 |
+| Framework | 19.08 GiB available (GTT) | 18.08 GiB | 11.2 GiB | none yet | [footprint](findings/footprint.md): I.3 |
