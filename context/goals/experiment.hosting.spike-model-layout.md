@@ -1,6 +1,6 @@
 # goal · experiment.hosting.spike-model-layout
 
-- **State:** building
+- **State:** brief ready
 - **Task:** hosts
 - **Branch:** hosts
 
