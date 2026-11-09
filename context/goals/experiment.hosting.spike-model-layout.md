@@ -114,6 +114,8 @@ Door          two-way: pins and preset revert by pull request; the container is
 
 slices 0/4 committed · standards — · spec — · editor —
 
+slice 1: repo changes committed (spike-model-engines 3b60fa4, spike-model-layout a3f6f47); next: architect root updates on all three hosts, then Framework R1-R2 at b11960, push engines `hosts` to framework as `hosts-next`, `engines llama update`, R3-R4.
+
 ## Decisions
 
 - setup: kind context; check `mise run check`, currency `mise run currency`, no gate; public GitHub with `gh pr create` and `gh pr merge --merge --delete-branch`, no CI — copied from spike-hosting-upgrades.
@@ -155,3 +157,4 @@ slices 0/4 committed · standards — · spec — · editor —
 - coordinator · intake note (ai-hosting.md, experiment.hosting): spike-model-engines' llama.cpp setup guide ("GB10, in a container") says gb10-2 is reserved and puts the clone in the home directory, not ~/repos (outside host/).
 - coordinator · intake note (ai-hosting.md, experiment.hosting): spike-ai-pipeline's laptop-side `mise run host-update` fails at its clone pull once the clone is gone; it touches nothing first.
 - coordinator · intake note (ai-hosting.md, experiment.hosting): The Framework holds the same store extras as gb10-1 (its framework task can weigh them).
+- spike-model-engines · intake note: docs outside host/ still name strix-halo's pin as b11960 (context/README.md "Held pins", docs/engines/llama.cpp/README.md:14, update.md:35, setup.md:303 and :591); this spike changes only host/.
