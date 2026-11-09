@@ -143,7 +143,9 @@ Door          two-way: the helper and scenarios revert by commit; hosts change o
 
 ## Progress
 
-slices 0/4 committed · standards — · spec — · editor —
+slices 0/4 committed (slice 1 in progress) · standards — · spec — · editor —
+
+Slice 1: helper and scenarios committed (288b73a); root updates done (.state/footprint/root-updates.md); gb10-1 alone loads (6 sections), set A together, P1-P4 done (step log .state/measure/gb10-1/2026-11-09.log). Paused 19:53Z with a fresh set A loaded on gb10-1 (read 5 s after load: 21.46 GiB); next: re-read set A after 30 s idle, then L1-L4, quote gb10-2's log, unload gb10-1.
 
 ## Decisions
 
