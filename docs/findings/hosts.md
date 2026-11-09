@@ -293,14 +293,19 @@ output, with the per-container fields removed, one more field differs without ef
 per-host app state (dconf, btop, eog, gtk-4.0, yelp, the pnpm and fastfetch caches, and gb10-2's
 lazygit) is left as each host's own use.
 
-**Pending, the architect's root step:** gb10-2 has no drop-caches sudoers rule yet. The architect
-was given:
+**gb10-2's drop-caches rule, the architect's root step**, run on gb10-2 as gb10-1's was set up
+(spike-model-engines `docs/engines/llama.cpp/setup.md`, GB10 step 7), as run:
 
 ```
-echo "jaime ALL=(root) NOPASSWD: /usr/sbin/sysctl vm.drop_caches=3" | sudo tee /etc/sudoers.d/drop-caches.new >/dev/null && sudo visudo -cf /etc/sudoers.d/drop-caches.new && sudo install -m 0440 -o root -g root /etc/sudoers.d/drop-caches.new /etc/sudoers.d/drop-caches && sudo rm /etc/sudoers.d/drop-caches.new
+echo "jaime ALL=(root) NOPASSWD: /usr/sbin/sysctl vm.drop_caches=3" | sudo tee /etc/sudoers.d/drop-caches.new >/dev/null && sudo visudo -cf /etc/sudoers.d/drop-caches.new && sudo install -m 0440 -o root -g root /etc/sudoers.d/drop-caches.new /etc/sudoers.d/drop-caches && sudo rm /etc/sudoers.d/drop-caches.new && sudo -n -l | grep drop_caches
 ```
 
-Result: PENDING at the time of writing.
+It printed `/etc/sudoers.d/drop-caches.new: parsed OK` and `(root) NOPASSWD: /usr/sbin/sysctl
+vm.drop_caches\=3`. The session then read the same line on both GB10s:
+
+```sh
+for h in gb10-1 gb10-2; do echo "$h: $(ssh $h 'sudo -n -l 2>&1 | grep drop_caches')"; done
+```
 
 ## E. Parity: gb10-2 against gb10-1
 
@@ -480,7 +485,6 @@ counting none.
 
 - gb10-2 has no host descriptor and no run-noise figure in spike-hosting-upgrades. This session's
   within-session spread on gb10-2 (A 2.37%, B 0.52% output tok/s) is the first.
-- gb10-2's drop-caches sudoers rule, pending above.
 - The spike-model-engines `hosts` branch is published as a pull request and merged when the
   architect accepts this task's session brief; until then commit 3b60fa4 lives on the laptop's
   branch and on each host's local `hosts` branch, pushed to the hosts over SSH. Each host's clone

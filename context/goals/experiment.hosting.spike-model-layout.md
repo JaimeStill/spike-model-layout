@@ -115,7 +115,7 @@ Door          two-way: pins and preset revert by pull request; the container is
 slices 3/4 committed (slice 4 is the architect's walkthrough, after the session brief) · standards done (ce2fa1f, 8454a41) · spec done (3 gaps closed in e2587f3) · editor done
 
 - Engines clones: gb10-1's, gb10-2's and the Framework's spike-model-engines clones are on local branch `hosts` at 3b60fa4, pushed as `hosts-next`. After SHIP merges the engines pull request, each host runs `git switch main && git pull --ff-only && git branch -D hosts hosts-next`, and its router is restarted only if the merge changed the preset.
-- gb10-2's drop-caches sudoers rule is pending the architect (Behavior 8).
+- gb10-2's drop-caches rule installed by the architect 2026-11-09; `sudo -n -l` lists it on both GB10s (Behavior 8).
 
 ## Decisions
 
@@ -145,6 +145,7 @@ slices 3/4 committed (slice 4 is the architect's walkthrough, after the session 
 - hosts: gb10-2 ends serving set A from the shared preset; its store stays with set A's four files.
 - hosts: gb10-2's spike-ai-pipeline clone removed; gb10-2 aligned to gb10-1 (the architect).
 - hosts: the drop-caches sudoers rule installed on gb10-2, as on gb10-1.
+- hosts: slice 4's walkthrough waived by the architect: the hosts only need to be set up for the tasks that follow, where the measurements count.
 - hosts: gb10-2 aligned only to what dotfiles and the engines suite set up; gb10-1's drift outside them removed (the architect).
 - hosts: gb10-1's store extras (12B, 31B, E4B QAT GGUFs; granite safetensors; 32.45 GB) cleared: nothing this spike or a planned goal runs reads them, and each task downloads what it serves.
 - hosts: measure-lib.sh drops tier and conform and fixes MEASURE_ROOT.
