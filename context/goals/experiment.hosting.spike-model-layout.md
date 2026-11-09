@@ -143,9 +143,9 @@ Door          two-way: the helper and scenarios revert by commit; hosts change o
 
 ## Progress
 
-slices 2/4 done (slice 1: helper and scenarios 288b73a, gb10-1 measured; slice 2: the Framework measured, serving a fresh set A; step logs .state/measure/<host>/2026-11-09.log) · standards — · spec — · editor —
+slices 3/4 done (slice 1: helper and scenarios 288b73a, gb10-1 measured; slice 2: the Framework measured, serving a fresh set A; slice 3: finding and capacity table 59c70b0; step logs .state/measure/<host>/2026-11-09.log) · standards — · spec — · editor —
 
-Next: slice 3, the footprint finding and capacity table.
+Next: standards review, spec review, editor; then slice 4, the architect's walkthrough.
 
 ## Decisions
 
@@ -199,10 +199,10 @@ Next: slice 3, the footprint finding and capacity table.
 - footprint: Gemma 4 26B-A4B's Vulkan aborts are recorded as a constraint row (K layer under 4 GiB, so c < 2,097,152; #29221 at 15 slots), not tested; testing is the framework task's.
 - footprint: the session ends with the Framework serving set A and gb10-1 with nothing loaded, as hosts left it, since role-split loads what it compares.
 - footprint (BUILD): set A's first idle read on gb10-1 came 8 s after the last load; a second read at 45 s gave the same figure (21.45 GiB), so the brief's 30 s read stands; the reload before L1-L4 was read again after the architect's pause.
-- footprint (BUILD): L2 (vision-b at 1440p) stopped under gb10-1's floor at 66 s (10.39 GiB): the 26B-A4B's RSS grew 1.2 -> 10.4 GiB with its GPU memory flat, llama.cpp's host prompt cache filling to its cache-ram default (8192 MiB), which set A's Gemma sections leave on. Recorded as a finding; L2 not rerun; capping it is a preset change, outside this task.
+- footprint (BUILD): L2 (vision-b at 1440p) stopped under gb10-1's floor at 61 s (10.39 GiB): the 26B-A4B's RSS grew 1.2 -> 10.4 GiB with its GPU memory flat, llama.cpp's host prompt cache filling to its cache-ram default (8192 MiB), which set A's Gemma sections leave on. Recorded as a finding; L2 not rerun; capping it is a preset change, outside this task.
 - footprint (BUILD): after L2's stop, only the 26B-A4B was reloaded (unload, load) to return above the floor before L3 and L4, which measure the E4B and granite.
 - footprint (BUILD): gb10-1's network path turned direct (LAN, 3 ms) after the architect's pause, from DERP(nyc) 56 ms; L1-L4's TTFT ran on it. Speed isn't judged in this task.
-- footprint (BUILD): on the Framework, llama.cpp's host prompt cache sits in system RAM outside GTT, so the GTT floor watch can't see it; L2 grew the 26B-A4B's RSS to 9.87 GiB with GTT flat, system RAM available 23.6 -> 13.7 GB. The session read `free` beside each Framework cell.
+- footprint (BUILD): on the Framework, llama.cpp's host prompt cache sits in system RAM outside GTT, so the GTT floor watch can't see it; L2 grew the 26B-A4B's RSS to 9.87 GiB with GTT flat, system RAM available 23,639 -> 13,660 MiB (free -m). The session read `free` beside each Framework cell.
 - footprint (BUILD): one of L2's 32 requests on the Framework errored in llama.cpp's Gemma 4 output parser ("does not match the expected peg-gemma4 format"), not on memory; recorded, not rerun.
 - footprint (BUILD): the Framework ends with set A reloaded fresh after L4, dropping L2's 9.9 GiB prompt cache.
 
