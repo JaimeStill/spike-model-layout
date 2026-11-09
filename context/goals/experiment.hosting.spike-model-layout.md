@@ -112,9 +112,10 @@ Door          two-way: pins and preset revert by pull request; the container is
 
 ## Progress
 
-slices 0/4 committed · standards — · spec — · editor —
+slices 1/4 committed · standards — · spec — · editor —
 
-slice 1: repo changes committed (spike-model-engines 3b60fa4, spike-model-layout a3f6f47); next: architect root updates on all three hosts, then Framework R1-R2 at b11960, push engines `hosts` to framework as `hosts-next`, `engines llama update`, R3-R4.
+slice 1 done 2026-11-09: repo changes (spike-model-engines 3b60fa4, spike-model-layout a3f6f47); root updates by the architect on all three hosts, none needing a reboot (.state/hosts/root-updates.md); stack and ping read (.state/hosts/stack-2026-11-09.txt). Framework R1-R4 (.state/measure/framework/2026-11-09.log): b11960 A 44.23, B 71.25 tok/s; b12098 A 43.90, B 70.72 tok/s (-0.75%, inside 1.1%). The first `engines llama update` ran without LLAMA_FLAVOR and moved the Framework to server-rocm-b12098; rerun with LLAMA_FLAVOR=vulkan put it on server-vulkan-b12098 before R3 (.state/hosts/framework-update.log). Framework serves set A at b12098 with the three vision keys. The Framework's engines clone is on local branch `hosts` (pushed as `hosts-next`); after SHIP merges, return it to main and delete `hosts`/`hosts-next`.
+next: slice 2 (align the GB10s).
 
 ## Decisions
 
