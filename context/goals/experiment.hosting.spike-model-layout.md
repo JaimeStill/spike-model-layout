@@ -143,7 +143,7 @@ Door          two-way: the helper and scenarios revert by commit; hosts change o
 
 ## Progress
 
-slices 3/4 done (slice 1: helper and scenarios 288b73a, gb10-1 measured; slice 2: the Framework measured, serving a fresh set A; slice 3: finding and capacity table 59c70b0; step logs .state/measure/<host>/2026-11-09.log) · standards — · spec — · editor —
+slices 3/4 done (slice 1: helper and scenarios 288b73a, gb10-1 measured; slice 2: the Framework measured, serving a fresh set A; slice 3: finding and capacity table 4ba8f9e; step logs .state/measure/<host>/2026-11-09.log) · standards — · spec — · editor —
 
 Next: standards review, spec review, editor; then slice 4, the architect's walkthrough.
 
@@ -205,6 +205,8 @@ Next: standards review, spec review, editor; then slice 4, the architect's walkt
 - footprint (BUILD): on the Framework, llama.cpp's host prompt cache sits in system RAM outside GTT, so the GTT floor watch can't see it; L2 grew the 26B-A4B's RSS to 9.87 GiB with GTT flat, system RAM available 23,639 -> 13,660 MiB (free -m). The session read `free` beside each Framework cell.
 - footprint (BUILD): one of L2's 32 requests on the Framework errored in llama.cpp's Gemma 4 output parser ("does not match the expected peg-gemma4 format"), not on memory; recorded, not rerun.
 - footprint (BUILD): the Framework ends with set A reloaded fresh after L4, dropping L2's 9.9 GiB prompt cache.
+- footprint (BUILD): per-process figures under load are read once after each cell, not as each process's highest during L1-L4: `watch` samples only the pool, so the pool's lowest is a during-cell figure and the process figures are after-cell reads. The prompt cache that drives the finding holds its size until reload, so its after-read is its peak.
+- footprint (BUILD): the Framework's `free -m` outputs, which the step log doesn't hold, are kept in `.state/footprint/framework-free.txt` as the session's tool output showed them; no read was taken at set A idle before P1.
 
 ## Pending edits
 
