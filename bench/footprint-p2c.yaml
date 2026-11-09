@@ -1,0 +1,22 @@
+# Footprint cell P2c: gemma-4-26B-A4B QAT, 1 stream sending 1 request of 7,900 synthetic prompt
+# tokens and exactly 64 output tokens: a text request near the section's 8,192-token slot, the
+# text counterpart to P2a and P2b (footprint-p2a.yaml says why P2 is three scenarios). Adapted from
+# spike-hosting-upgrades' bench/long-b.yaml, at 1 stream and 1 request. Engine-neutral: the
+# section and its tokenizer (google/gemma-4-26B-A4B-it) are given on the command line, as `cell`'s
+# <section> <tokenizer>, the JSON's path by `cell`, and the target in
+# GUIDELLM__SPEC__BACKEND__TARGET. GuideLLM sends max_completion_tokens with ignore_eos whenever
+# output_tokens is set, so the request generates its full 64. Run from the repository root.
+spec:
+  backend:
+    kind: openai_http
+    request_format: /v1/chat/completions
+  profile:
+    kind: concurrent
+    streams: 1
+  data:
+    - kind: synthetic_text
+      prompt_tokens: 7900
+      output_tokens: 64
+  constraints:
+    - kind: max_requests
+      count: 1
