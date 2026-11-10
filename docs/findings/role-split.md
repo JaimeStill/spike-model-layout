@@ -38,7 +38,15 @@ and network path"). The root updates (section A) moved no kernel, driver, CUDA o
 
 **Network path.** `tailscale ping -c 1` from the laptop, before and after the updates: gb10-1 via
 192.168.1.216, 2 ms both times; gb10-2 via 192.168.1.138, 0 s then 1 ms. Both direct on the LAN for
-the whole session.
+slice 1 (the anchors and the full-set arm). The laptop then moved off the LAN: read again at
+2026-11-10T10:23:54-05:00 (15:23:54Z), after D1 and D2, gb10-1 answered via DERP(nyc) in 56 ms and
+gb10-2 via DERP(iad) in 61 ms (112 ms at a read a minute earlier), "direct connection not
+established" (`.state/role-split/ping-1023.txt`). No ping was recorded between 11:33Z and 15:23Z, so
+the split arm (section G on) and D1 and D2 ran from the laptop over Tailscale relays, not the LAN.
+The architect judged network latency not the bottleneck and the split's cells weren't rerun on the
+LAN (goal record, Decisions). Figures read on the server (encode, prompt eval, ITL, memory, buffers)
+don't carry the path; figures read on the client (TTFT, request latency, requests a second, RTFx)
+do, most for the shortest requests.
 
 **Engine and preset.** llama.cpp b12098 on both GB10s, each router serving spike-model-engines'
 shared preset (`host/llama-preset/models.ini`) from the `role-split` branch at 2d7ae32 (section A).
@@ -745,8 +753,8 @@ D1 rules out the residents and the page cache as needed for it: it was slow with
 loaded and the cache dropped. What did differ, none of it measured apart: F-audio ran at
 12:13Z, the session's earlier part, after F-agent and F-vision; S-audio at 14:30Z, after S-vision,
 with the 16-slot 26B-A4B co-resident and recently busy and granite loaded; D1 and D2 at 15:15Z
-after a drop. The laptop running GuideLLM, the network path from it (direct on the LAN when read
-at the session's start, Stack; not read again), and the router process (pid 1622373 in every `footprint`
+after a drop. The laptop running GuideLLM, the network path from it (direct on the LAN for F-audio;
+over Tailscale relays, 56-112 ms, when read after D1 and D2, Stack, so for S-audio, D1 and D2), and the router process (pid 1622373 in every `footprint`
 read of the session, its container started 11:34:10Z, its log grown by every cell) are the parts the slow runs share and these reads don't measure.
 Nothing here decides the cause.
 
