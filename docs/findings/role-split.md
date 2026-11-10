@@ -577,7 +577,7 @@ first four requests at 4 streams ended at 12.98 to 13.04 s, and at 8 streams fou
 and the next at 25.8 s.
 
 **The router log.** gb10-2's router log for process `[45453]`, the 16-slot 26B-A4B, read
-read-only at 14:59:52Z with the command below and saved in
+read-only at 14:59:09Z with the command in section M and saved in
 `.state/role-split/vision-encode-gb10-2-2026-11-10.log` (its timestamps are minutes, seconds,
 milliseconds and microseconds since the process started, during the 14:10:34Z load). The
 projector loads on the GPU, with the section's minimum image size:
@@ -873,7 +873,8 @@ own line before the command it prefixes.
 From `.state/measure/gb10-2/2026-11-10.log`, left out as above. In `f2.sh` the `after` function is
 defined in the step file itself, with the same steps. The mixed cells' processes ran in the
 background (`&`) and `wait`, so the trace prints their assignments, `wait` and the `cell` lines in
-the order the shell reached them.
+the order the shell reached them. The trace prints each `for s in ...` line again before every
+pass of its loop; it is shown once, before the loop's first `load`.
 
 ```
 06:39:25  source <scratchpad>/g2ab.sh
@@ -1084,33 +1085,73 @@ D1's and D2's `cell` printed (10:16:32 and 10:18:45):
 
 ### Commands not in a step log
 
-The stack reads, the push and router restart, and the launch of the split's mixed cells ran from
-the laptop outside the step helpers. Their outputs are saved
-(`.state/role-split/stack-pre-2026-11-10.txt`, `stack-2026-11-10.txt`,
-`push-restart-2026-11-10.txt`), but the commands themselves are not in a step log or a saved file,
-so they are not quoted here. The split's mixed cells were launched by the scratch file
-`<scratchpad>/mixed.sh`, which runs each host's step file (`mixed-gb10-1.sh`, `mixed-gb10-2.sh`)
-through `<scratchpad>/step.sh <host> <file>` in the background on both hosts at once, with `MIX`,
-`AGENT`, `VISION`, `AUDIO` and `EMBED` exported; the values each run took show in the step logs'
-`:` and `GUIDELLM__SPEC__PROFILE__STREAMS` lines above.
+The stack reads, the WAV cut, the push and router restart, the launch of the split's mixed cells
+and the pings after D1 and D2 ran from the laptop outside the step helpers. They are quoted from
+the session's command history, each with its time (UTC), from the project's root; `<scratchpad>`
+stands for the scratch directory as above.
 
-The per-level tables in D, F, I and J and the errors in L.4 and L.5 were read from the cells' JSON,
-from the project's root:
+The stack read before the root updates (11:22:38Z) and after them (11:33:52Z):
 
 ```sh
-python3 -I <scratchpad>/levels.py <agent|vision|audio|embed> .state/measure/<host>/role-split-<cell>.json
-jq -r '.benchmarks[] | (.config.strategy.streams|tostring) as $s | .requests.errored[]? | "s=\($s): \(.info.error)"' .state/measure/<host>/role-split-<cell>.json
+mkdir -p .state/role-split && { date -Is; for h in gb10-1 gb10-2; do echo "== $h"; timeout 60 ssh -o BatchMode=yes $h 'apt update -qq 2>/dev/null >/dev/null; apt list --upgradable 2>/dev/null | grep -v "^Listing"; uname -r; nvidia-smi --query-gpu=driver_version --format=csv,noheader; docker --version; docker ps --format "{{.Names}} {{.Image}} {{.Status}}"; cd ~/repos/spike-model-engines && git status -sb | head -1'; done; for h in gb10-1 gb10-2; do tailscale ping -c 1 $h; done; } 2>&1 | tee .state/role-split/stack-pre-2026-11-10.txt
+{ date -Is; for h in gb10-1 gb10-2; do echo "== $h"; timeout 60 ssh -o BatchMode=yes $h 'apt list --upgradable 2>/dev/null | grep -vc "^Listing"; uname -r; nvidia-smi --query-gpu=driver_version --format=csv,noheader; nvidia-smi | grep -o "CUDA Version: [0-9.]*"; docker --version; nvidia-ctk --version | head -1; . /etc/os-release; echo $PRETTY_NAME; cat /etc/dgx-release 2>/dev/null | grep -i version | head -2; docker ps --format "{{.Names}} {{.Image}} {{.Status}}"'; done; for h in gb10-1 gb10-2; do tailscale ping -c 1 $h; done; } 2>&1 | tee .state/role-split/stack-2026-11-10.txt
 ```
 
-Section L.1's timelines and router-log extracts, from the project's root, at 14:59:52Z for the log
-reads (read-only: `docker logs` on gb10-2, nothing loaded, unloaded or requested). Each saved file
-starts with the command that made it:
+The probe's WAV cut (11:29:49Z), with its check:
 
 ```sh
-jq -r '.benchmarks[] | .config.strategy.streams as $s | .start_time as $t0 | [.requests.successful[], .requests.errored[]] | sort_by(.request_start_time)[] | "\($s) \((.request_start_time-$t0)*100|round/100) \((.request_end_time-$t0)*100|round/100) \((.request_end_time-.request_start_time)*100|round/100) \(.time_to_first_token_ms // "-" | if type=="number" then round else . end)"' .state/measure/gb10-2/role-split-s-vision.json
-ssh gb10-2 'docker logs llama 2>&1 | grep -E "^\[45453\]" | grep -E "encode_mtmd_|decoding image batch|image decoded|prompt eval time|CLIP using|image_min_pixels"'
-ssh gb10-2 'docker logs llama 2>&1 | grep -E "^\[44615\]" | grep -E "audio decoded|CLIP using"'
+ffmpeg -nostdin -hide_banner -loglevel error -n -i ~/docs/audio/long/ami-es2002a-mix-headset.wav -t 600 -ac 1 -ar 16000 -c:a pcm_s16le .state/role-split/ami-es2002a-first10min.wav && ffprobe -v error -show_entries format=duration,size:stream=sample_rate,channels,codec_name -of compact .state/role-split/ami-es2002a-first10min.wav; sha256sum .state/role-split/ami-es2002a-first10min.wav
 ```
+
+The push and router restart (11:34:02Z):
+
+```sh
+{ for h in gb10-1 gb10-2; do echo "== $h"; git -C /home/jaime/experiments/spike-model-engines push $h:repos/spike-model-engines role-split:hosts-next 2>&1 | tail -1; ssh $h 'cd ~/repos/spike-model-engines && git switch -c hosts hosts-next 2>&1 | tail -1 && git log --oneline -1 && docker restart llama'; done; for h in gb10-1 gb10-2; do for i in $(seq 1 60); do curl -sf http://$h:8080/health >/dev/null && break; sleep 3; done; echo "$h health: $(curl -s http://$h:8080/health)"; curl -s http://$h:8080/models | jq -r '.data[] | "\(.id)\t\(.status.value)"'; done; } 2>&1 | tee .state/role-split/push-restart-2026-11-10.txt
+```
+
+The split's mixed cells, S-mixed (14:34:22Z) and S-knee (14:40:21Z). `mixed.sh` runs each host's
+step file (`mixed-gb10-1.sh`, `mixed-gb10-2.sh`) through `<scratchpad>/step.sh <host> <file>`,
+which sources the helpers for the host, in the background on both hosts at once, with `MIX`,
+`AGENT`, `VISION`, `AUDIO` and `EMBED` exported; what each step file ran is in the step logs above:
+
+```sh
+D=<scratchpad>; MIX=mixed AGENT=4 VISION=4 AUDIO=4 EMBED=16 nohup $D/mixed.sh >/dev/null 2>&1 </dev/null & echo started
+D=<scratchpad>; MIX=knee AGENT=4 VISION=1 AUDIO=1 EMBED=16 nohup $D/mixed.sh >/dev/null 2>&1 </dev/null & echo started
+```
+
+The pings after D1 and D2 (15:23:38Z, then 15:23:54Z into `ping-1023.txt`):
+
+```sh
+tailscale ping -c 1 gb10-2; tailscale ping -c 1 gb10-1
+{ date -Is; tailscale ping -c 1 gb10-1; tailscale ping -c 1 gb10-2; tailscale status --self --peers=false 2>/dev/null | head -2; } > .state/role-split/ping-$(date +%H%M).txt 2>&1; cat .state/role-split/ping-*.txt; grep -n "tailscale ping\|DERP\|via " .state/measure/gb10-2/2026-11-10.log | tail -5
+```
+
+The per-level tables in D, F, I and J (14:48:28Z) and the errors in L.4 and L.5 (14:49:39Z) were
+read from the cells' JSON:
+
+```sh
+S=<scratchpad>; M=.state/measure;
+python3 -I $S/levels.py agent $M/gb10-2/role-split-f-agent.json $M/gb10-1/role-split-s-agent.json $M/gb10-2/role-split-f-mixed-agent.json $M/gb10-1/role-split-s-mixed-agent.json $M/gb10-1/role-split-s-knee-agent.json
+python3 -I $S/levels.py vision $M/gb10-2/role-split-f-l2.json $M/gb10-2/role-split-f-vision.json $M/gb10-2/role-split-s-vision.json $M/gb10-2/role-split-f-mixed-vision.json $M/gb10-2/role-split-s-mixed-vision.json $M/gb10-2/role-split-s-knee-vision.json
+python3 -I $S/levels.py audio $M/gb10-2/role-split-f-audio.json $M/gb10-2/role-split-s-audio.json $M/gb10-2/role-split-f-mixed-audio.json $M/gb10-2/role-split-s-mixed-audio.json $M/gb10-2/role-split-s-knee-audio.json
+python3 -I $S/levels.py embed $M/gb10-2/role-split-f-embed.json $M/gb10-2/role-split-f-mixed-embed.json $M/gb10-2/role-split-s-mixed-embed.json $M/gb10-2/role-split-s-knee-embed.json
+python3 -I $S/levels.py agent $M/gb10-*/role-split-anchor-*.json
+for f in .state/measure/gb10-*/role-split-*.json; do case $f in *probe*) continue;; esac; jq -r --arg f "${f##*/}" '.benchmarks[] | (.config.strategy.streams|tostring) as $s | .requests.errored[]? | "\($f) s=\($s): \(.info.error // .error // "?" | tostring | .[0:220])"' $f 2>/dev/null; done
+```
+
+Section L.1's timelines (14:59:04Z) and router-log extracts (read-only: `docker logs` on gb10-2,
+nothing loaded, unloaded or requested): process `[45453]` read at 14:59:09Z, process `[44615]` at
+14:59:42Z, each into the scratch directory, and both copied into `.state/role-split/` at 14:59:52Z
+under a header that names the read without its `-o BatchMode=yes`:
+
+```sh
+cd /home/jaime/experiments/spike-model-layout && out=.state/role-split/s-vision-timelines-2026-11-10.txt; { echo "# Per-request timelines, .state/measure/gb10-2/role-split-s-vision.json, seconds from each level's start (jq, read 2026-11-10)"; echo "# streams start end duration ttft_ms"; jq -r '.benchmarks[] | .config.strategy.streams as $s | .start_time as $t0 | [.requests.successful[], .requests.errored[]] | sort_by(.request_start_time)[] | "\($s) \((.request_start_time-$t0)*100|round/100) \((.request_end_time-$t0)*100|round/100) \((.request_end_time-.request_start_time)*100|round/100) \(.time_to_first_token_ms // "-" | if type=="number" then round else . end)"' .state/measure/gb10-2/role-split-s-vision.json; } > $out; awk '$1==16' $out; wc -l $out
+cd /home/jaime/experiments/spike-model-layout && ssh -o BatchMode=yes gb10-2 'docker logs llama 2>&1 | grep -E "^\[45453\]" | grep -E "encode_mtmd_|decoding image batch|image decoded|prompt eval time|CLIP using|image_min_pixels"' > <scratchpad>/v45453.txt; echo rc=$?; S=<scratchpad>; wc -l $S/v45453.txt; head -40 $S/v45453.txt
+S=<scratchpad>; ssh -o BatchMode=yes gb10-2 'docker logs llama 2>&1 | grep -E "^\[44615\]" | grep -E "audio decoded|CLIP using"' > $S/a44615.txt; echo rc=$?; wc -l < $S/a44615.txt; head -3 $S/a44615.txt; grep -o 'in [0-9]* ms' $S/a44615.txt | awk '{print $2}' | sort -n | awk '{a[NR]=$1} END{print "n",NR,"min",a[1],"median",a[int((NR+1)/2)],"p95",a[int(NR*0.95)],"max",a[NR]}'
+```
+
+L.1's encode-to-decode gaps and `image decoded` times were computed from the vision extract by two
+inline Python scripts the session ran (14:59:20Z, 14:59:28Z), which are not quoted here.
 
 Section L.7's per-request timings, from the project's root, at 15:20:41Z (read-only: `docker logs`
 on gb10-2), each window a run's 1-stream level from its JSON and each port the E4B child serving it
