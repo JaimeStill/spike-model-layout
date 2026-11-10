@@ -222,7 +222,7 @@ Door          two-way: the clone move and router restart revert by
 
 ## Progress
 
-slices 3/4 committed · standards ✓ · spec ✓ · editor ✓
+slices 3/4 committed, slice 4 waived · standards ✓ · spec ✓ · editor ✓
 
 ## Decisions
 
@@ -359,6 +359,7 @@ slices 3/4 committed · standards ✓ · spec ✓ · editor ✓
 - framework (BUILD, standards review): the finding drops the hosts' LAN addresses (STANDARDS.md, Docs: no LAN identifier is committed), and quotes eight launch commands as run, each step file's heredoc write shown with its body elided to the copy in `.state/framework/step-files/`, and the table command with its compare step.
 - framework (BUILD, spec review): the 84.25 GiB system-memory low is scoped to the capability arrangement, with the anchors' 52.04 / 52.17 GiB beside it; X-embed's table gains its errored count; the anchors' pings are dated by the step log's trace, since their pongs carry no date.
 - framework (BUILD, escalation): the branch was rewritten before publishing so the hosts' LAN addresses, committed in the finding's first commit and removed by the standards review, never reach the public history: the removal folded into that commit with a non-interactive fixup rebase over origin/main, the tree unchanged (the architect).
+- framework: slice 4's walkthrough waived by the architect, as in hosts; `bench/framework-walk-vision.yaml` stays as the one-level cell for a later rerun (the architect).
 
 ## Pending edits
 
