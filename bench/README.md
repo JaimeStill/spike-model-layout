@@ -28,8 +28,9 @@ the target in `GUIDELLM__SPEC__BACKEND__TARGET`. Each file's header gives its lo
 
 F-L2 reruns footprint's L2 unchanged, so it reads `footprint-l2.yaml` itself rather than a copy.
 
-The full set's sweeps use levels 1, 2, 3, 4 and 8, and the split's 1, 4, 8, 12 and 16, each
-through GuideLLM's knee profile with adaptive refinement off and no ramp-up.
+The full set's knee sweeps use levels 1, 2, 3, 4 and 8, and the split's 1, 4, 8, 12 and 16, each
+through GuideLLM's knee profile with adaptive refinement off and no ramp-up. F-embed is a
+concurrent sweep at 1, 2, 4, 8 and 16 streams.
 
 ### Streams in the mixed cells
 
@@ -38,8 +39,9 @@ Each mixed cell is four GuideLLM processes started together, one a purpose, each
 count, so one file serves every mixed cell: each `cell` call gives its streams in
 `GUIDELLM__SPEC__PROFILE__STREAMS`, which GuideLLM reads into the profile when the file leaves
 `streams` out (a value in the file would win over the variable). F-mixed and S-mixed take the load
-targets, agent 4, vision 4, audio 4 and embedding 16; S-knee takes each purpose's split knee from
-S-agent, S-vision and S-audio, and granite 16. For example, F-mixed's agent process on gb10-2:
+targets, agent 4, vision 4, audio 4 and embedding 16; S-knee takes the level each purpose held in
+its split sweep (the role-split finding, section I: S-agent 4, S-vision 1, S-audio 1), and
+granite 16. For example, F-mixed's agent process on gb10-2:
 
 ```sh
 GUIDELLM__SPEC__PROFILE__STREAMS=4 cell <name> role-split-mixed-agent gpt-oss-120b-MXFP4-set-a openai/gpt-oss-120b
@@ -56,8 +58,8 @@ audio ([`docs/findings/footprint.md`](../docs/findings/footprint.md), section I.
 on the laptop, from the repository root, into the untracked `.state/role-split/`:
 
 ```sh
-ffmpeg -nostdin -hide_banner -n -i ~/docs/audio/long/ami-es2002a-mix-headset.wav -t 600 \
-  -ac 1 -ar 16000 -c:a pcm_s16le .state/role-split/ami-es2002a-first10min.wav
+ffmpeg -nostdin -hide_banner -loglevel error -n -i ~/docs/audio/long/ami-es2002a-mix-headset.wav \
+  -t 600 -ac 1 -ar 16000 -c:a pcm_s16le .state/role-split/ami-es2002a-first10min.wav
 ```
 
 The source is already 16 kHz mono PCM (1,272.64 s); the cut is 600.000 s, 19,200,078 bytes,

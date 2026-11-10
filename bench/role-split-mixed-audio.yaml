@@ -7,7 +7,7 @@
 # The scenario sets no stream count: each cell gives its own in GUIDELLM__SPEC__PROFILE__STREAMS,
 # which GuideLLM reads into the profile's streams when the file leaves them out (a value in the
 # file would win over the variable), so one file serves F-mixed and S-mixed at the load target, 4,
-# and S-knee at the purpose's split knee: `GUIDELLM__SPEC__PROFILE__STREAMS=4 cell <name>
+# and S-knee at what it held in the split: `GUIDELLM__SPEC__PROFILE__STREAMS=4 cell <name>
 # role-split-mixed-audio <section> <tokenizer>`. With none set the run refuses to start. Run
 # directly, GuideLLM's `--profile kind=concurrent,streams=<n>` sets it the same way.
 # Engine-neutral: the section and its tokenizer (google/gemma-4-E4B-it) are given on the command
