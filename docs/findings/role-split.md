@@ -18,6 +18,9 @@ found that:
 - the split's slower single-stream audio comes from each request's trip from the laptop over a
   Tailscale relay, about 0.4 s a request, not from the 16-slot section (L.7).
 
+The architect's walkthrough reloaded the agent-only section on gb10-1 and reran S-agent's level 4
+as its own cell: section G's idle read and buffers and D.1's level 4 reproduce (L.8).
+
 It decides nothing.
 
 **Which figures size the layout.** Production clients sit on the same direct network as the GPUs,
@@ -28,7 +31,7 @@ memory, buffers) are unaffected ("Stack, engine and network path").
 
 | Host | Serves at the end of the session |
 | --- | --- |
-| gb10-1 | `gpt-oss-120b-MXFP4-agent-only` (c 1,179,648, 16 slots, unified), 12.47 GiB available |
+| gb10-1 | `gpt-oss-120b-MXFP4-agent-only` (c 1,179,648, 16 slots, unified), reloaded fresh in the walkthrough (L.8): 12.86 GiB available after its cell, read 17:14:23Z |
 | gb10-2 | `gemma-4-26B-A4B-it-qat-Q4_0-16-slots`, `gemma-4-E4B-it-Q8_0-16-slots` and granite, reloaded fresh after the D1/D2 pair (L.7): 77.33 GiB available idle, read 15:19:53Z |
 | framework | set A from main, untouched: no read, load, request or clone change this task |
 
@@ -816,6 +819,121 @@ dropped and read at 15:19:53Z: **77.33 GiB available (m)**, against G's 77.40. P
 MiB): 26B-A4B 25335 / 1231, E4B 8546 / 4157, granite 863 / 827, G's figures; router 170 / 622.
 Their buffers, as `footprint` printed them, are G's.
 
+### L.8 The architect's walkthrough (slice 4)
+
+The architect ran slice 4 on gb10-1 at 11:57-12:14 local (16:57-17:14Z), from their own shell,
+sourcing the step helpers, so every command is in gb10-1's step log
+(`.state/measure/gb10-1/2026-11-10.log`). It reloads the agent-only section as section G did, reads
+its footprint, and reruns S-agent's level 4 as its own cell,
+[`bench/role-split-walk-agent.yaml`](../../bench/role-split-walk-agent.yaml) (4 streams, 110 s,
+S-agent's 4-turn sessions). It reproduces section G's idle read and buffers and D.1's level 4.
+
+The laptop was off the LAN (the architect), so the cell ran over the same relay path as S-agent
+("Stack, engine and network path"); no ping was recorded during the walkthrough. Its client-side
+figures (TTFT, request latency, requests a second, prompt tok/s) carry the relay as S-agent's do.
+
+The commands, in log order, local time, as the log has them:
+
+```
+11:57:44  # the step helpers sourced for gb10-1: the log's "measure log for gb10-1" line
+11:57:51  expoert MEASURE_FLOOR_GIB=12.2
+          # bash: command not found: expoert (rc 127)
+11:57:54  export MEASURE_FLOOR_GIB=12.2
+11:58:00  unload --all
+11:58:09  ssh gb10-1
+          # an interactive shell on gb10-1 until 11:58:20, for the first cache drop
+11:58:22  memory
+11:58:32  t0=2026-11-10T16:58:32Z
+11:58:42  load gpt-oss-120b-MXFP4-agent-only
+11:59:40  ssh gb10-1
+          # the second cache drop, until 11:59:52
+11:59:55  memory
+12:00:04  footprint 2026-11-10T16:58:32Z
+12:01:25  cell role-split-walk-s-agent-4 role-split-walk-agent gpt-oss-120b-MXFP4-agent-only openai/gpt-oss-120b
+12:13:53  clear
+12:13:55  ssh gb10-1
+          # the third cache drop, until 12:14:10
+12:14:22  memory
+12:14:26  footprint
+12:14:35  jq -r --arg purpose agent -f bench/levels.jq .state/measure/gb10-1/role-split-walk-s-agent-4.json
+```
+
+What ran inside the three interactive shells isn't in the step log, which records each only as
+`ssh gb10-1`. The architect pasted each (`.state/role-split/walkthrough-paste-2026-11-10.md`):
+
+```
+gb10-1 ~ ❯ sudo -n /usr/sbin/sysctl vm.drop_caches=3
+vm.drop_caches = 3
+gb10-1 ~ ❯ exit
+```
+
+Section G's step slept 30 s between the load and the second drop; the walkthrough has no `sleep`,
+and its drop ran in the shell open from 9 to 21 s after `load` returned (c: 11:59:31 to 11:59:40
+and 11:59:52). The third drop ran about 10 minutes after the cell ended, where section H's reads
+followed each cell at once.
+
+**The footprint read** (17:00:05Z), against section G's (14:11:42-14:11:44Z):
+
+| | Section G | Walkthrough |
+| --- | --- | --- |
+| Pool after `unload --all` and a drop | 117.70 GiB | 117.68 GiB |
+| Load time | 51.3 s | 48.3 s |
+| Idle pool after a drop (`memory`) | 13.59 GiB (m) | 13.56 GiB (m); `footprint`'s MemAvailable a few seconds later 13.55 |
+| Taken by the load (c) | 104.11 GiB | 104.12 GiB (117.68 − 13.56) |
+| Above the floor, idle (c) | 1.39 GiB | 1.36 GiB |
+| Cached after the drop | 2.45 GiB | 2.48 GiB |
+| Process GPU / RSS | 102925 / 2419 MiB | 102925 / 2419 MiB |
+| Router GPU / RSS | 170 / 346 MiB | 170 / 356 MiB |
+| Buffers | G's table | every line identical: model CUDA0 59851.68 / CUDA_Host 586.82; KV 41472.00 (1179648 cells, 18 layers, 16/1 seqs); SWA 90.00 (2560 cells, 16/1 seqs); compute CUDA0 1316.68 / CUDA_Host 1249.18; output 12.27; `n_slots = 16, n_ctx_slot = 131072, kv_unified = 'true'` |
+
+**The cell** (17:01:25-17:03:36Z under `watch`; GuideLLM's 110 s), from `bench/levels.jq`, against
+S-agent's level 4 (D.1) read from `role-split-s-agent.json` by the same program:
+
+| | S-agent, level 4 (D.1) | Walkthrough |
+| --- | --- | --- |
+| Turns ok / errored / incomplete | 12 / 0 / 4 | 12 / 0 / 4 |
+| Output tok/s | 55.85 | 55.85 |
+| Requests a second | 0.109 | 0.109 |
+| TTFT median | 2906 ms | 2849 ms |
+| ITL median / p95 | 50.97 / 66.42 ms | 51.00 / 65.02 ms |
+| Request latency median / p90 | 28.93 / 44.24 s | 28.86 / 43.42 s |
+| Prompt tok/s | 993 | 988 |
+| Floor (ITL ≤100 ms) | meets | meets |
+
+Output tok/s and requests a second are equal because the same 12 turns of 512 tokens completed in
+110 s (c: 12 × 512 / 110 = 55.85; 12 / 110 = 0.109). The step log's summary line reads the same:
+12 ok, 0 errored, 4 incomplete of 16; 55.85 tok/s completed, 59.99 every-token; TTFT median 2849 ms;
+ITL median 51 ms. The readout since 17:01:25Z: idle-slot saves 0, prompt saves 0, checkpoints 48;
+12 replies of 90 tokens or more, mean 18.7 tok/s (14.0 to 19.9). `.exit` reads 0.
+
+**Memory through the cell.** `watch`'s 12 samples fell from 13.54 GiB (13860 MiB, 17:01:36Z) to the
+lowest, **12.93 GiB (13241 MiB, 17:03:23Z)**, 0.73 GiB above the floor (c); `readout`'s `memory`
+just after, with no drop, read 12.92 GiB (17:03:36Z). After the third drop:
+
+| | S-agent, after (H) | Walkthrough, after |
+| --- | --- | --- |
+| Pool after a drop | 12.54 GiB | 12.86 GiB (`memory`); `footprint`'s MemAvailable 12.82 |
+| Process GPU / RSS | 103029 / 3329 MiB | 103029 / 2937 MiB |
+| Growth from idle, GPU / RSS (c) | +104 / +910 MiB | +104 / +518 MiB |
+
+S-agent's after read follows its five levels, to 16 streams; the walkthrough's follows level 4
+alone, so the smaller RSS growth and the higher pool are what a shorter run leaves, not a
+difference in the section. The GPU growth, +104 MiB, is the same.
+
+**What it establishes.** Section G's idle read reproduces within 0.03 GiB (13.56 against 13.59,
+with 9 to 21 s idle against 30 s), and its buffers and the process's GPU and RSS figures exactly.
+D.1's level 4 reproduces: the same turns, output and requests a second; TTFT 57 ms lower (c),
+ITL median 0.03 ms higher (c), p95 1.40 ms lower (c), request latency 0.07 s lower at the median
+and 0.82 s at p90 (c), prompt tok/s 5 lower (c).
+The load took 3.0 s less (c). The router's RSS read 10 MiB more, a figure no reading here rests on.
+
+**The placement read.** The architect read section J for one placement: the agent-only GB10 held 4
+sessions measured (I), against footprint's computed 9 (I.7, and section N). The architect made no
+separate comment.
+
+gb10-1 ends as it started, serving the agent-only section alone (pid 1632395, loaded fresh in the
+walkthrough).
+
 ## M. Every run
 
 | Run | Host | Tool and configuration | Load | Duration | Decision it informs |
@@ -843,6 +961,7 @@ Their buffers, as `footprint` printed them, are G's.
 | D2 | gb10-2 | as D1, the 16-slot E4B | as D1 | 60 s | as D1 (L.7) |
 | Restore | gb10-2 | the split's three sections after `unload --all` and a cache drop; 30 s idle | none | 27 s (load to last) | gb10-2 back to Behavior 12's state (L.7) |
 | Network cost | laptop and gb10-1, to gb10-2 | curl, `/v1/audio/transcriptions`, the 16-slot E4B | one 6 s clip (192,078 bytes), 5 requests from each, one by one, and one lone request from the laptop | 0.4 to 1.2 s a request | what the laptop's relay path adds to a request (L.7) |
+| Walkthrough | gb10-1 | the architect's shell, the step helpers: `unload --all` and a cache drop, the agent-only section loaded alone, a drop, `footprint`; then `cell`, `bench/role-split-walk-agent.yaml` | 4 streams, S-agent's 4-turn sessions | 48.3 s load; 110 s cell | section G's idle read and D.1's level 4, reproduced (L.8) |
 
 Every cell ran under `watch`, memory sampled every 10 s, capped at 10 min, the floor
 `MEASURE_FLOOR_GIB` 12.2 on both GB10s.
@@ -860,7 +979,8 @@ session's scratch directory,
 `/tmp/claude-1000/-home-jaime-experiments-spike-model-layout/1077e790-19b7-4c69-bebf-53d1c193a7e3/scratchpad`;
 the `source` lines are the step files, and the commands traced after each are what they ran.
 `after` (from `after.sh`) drops the cache, runs `memory` and `footprint`, and stops the arm if the
-pool reads under 12,492 MiB (the step file's text; the log traces its commands inside `after`).
+pool reads under 12,492 MiB (the step file's text; the log traces its commands inside `after`). The
+architect's walkthrough, in the same log from 11:57, is quoted in L.8.
 
 ```
 06:34:20  loaded
