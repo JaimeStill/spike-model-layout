@@ -1,0 +1,157 @@
+# Role-split mixed cells F-mixed, S-mixed and S-knee, the audio process: one of four GuideLLM
+# processes started together, one a purpose, each a constant concurrency for 240 s, under the 10
+# min cap. The full set's audio is set A's E4B section, ggml-org/gemma-4-E4B-it-GGUF:Q8_0; the
+# split's is gb10-2's gemma-4-E4B-it-Q8_0-16-slots. Each request is F-audio's
+# (role-split-audio-full.yaml): one LibriSpeech clip with the model card's transcription prompt,
+# the reply at most 256 tokens. It needs GuideLLM's audio extra, which mise.bench.toml installs.
+# The scenario sets no stream count: each cell gives its own in GUIDELLM__SPEC__PROFILE__STREAMS,
+# which GuideLLM reads into the profile's streams when the file leaves them out (a value in the
+# file would win over the variable), so one file serves F-mixed and S-mixed at the load target, 4,
+# and S-knee at the purpose's split knee: `GUIDELLM__SPEC__PROFILE__STREAMS=4 cell <name>
+# role-split-mixed-audio <section> <tokenizer>`. With none set the run refuses to start. Run
+# directly, GuideLLM's `--profile kind=concurrent,streams=<n>` sets it the same way.
+# Engine-neutral: the section and its tokenizer (google/gemma-4-E4B-it) are given on the command
+# line, as `cell`'s <section> <tokenizer>, the JSON's path by `cell`, and the target in
+# GUIDELLM__SPEC__BACKEND__TARGET. Run from the repository root.
+spec:
+  backend:
+    kind: openai_http
+    request_format: /v1/chat/completions
+    # A transcript is as long as its clip, so no request sets output tokens or ignore_eos; this
+    # caps each reply, sent as max_completion_tokens, should the model not stop.
+    max_tokens: 256
+  profile:
+    kind: concurrent
+  # The two sources are read side by side, one row of each a request, and the run stops when
+  # either runs out. GuideLLM doesn't cycle a source, and the 73 clips last about 70 s at 4 streams
+  # (footprint L3 sent 32 in 31 s), so source 1 reads the clean validation split 12 times over,
+  # 876 rows, by the split's `+`, and source 0 holds the card's prompt 876 times, one a row: room
+  # for 3.65 requests a second over the 240 s. Should a cell's streams send faster, the run ends
+  # when the rows do, before 240 s, and its JSON's duration says so.
+  data:
+    - kind: in_memory_dict
+      data:
+        prompt:
+          [
+            &prompt "Transcribe the following speech segment in English into English text. Only output the transcription, with no newlines.",
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt, *prompt,
+            *prompt, *prompt
+          ]
+    - kind: huggingface
+      source: hf-internal-testing/librispeech_asr_dummy
+      load_kwargs:
+        name: clean
+        split: validation+validation+validation+validation+validation+validation+validation+validation+validation+validation+validation+validation
+  # Only the prompt and the clip: LibriSpeech's own text column is the reference transcript, which
+  # the mapper's defaults would otherwise send as the prompt.
+  data_column_mapper:
+    kind: generative_column_mapper
+    column_mappings:
+      text_column: 0.prompt
+      audio_column: 1.audio
+  # Every clip re-encoded as 16 kHz mono WAV, which llama.cpp's input_audio accepts; the source is
+  # FLAC, which it doesn't.
+  data_preprocessors:
+    - kind: encode_media
+      audio_kwargs:
+        audio_format: wav
+        encode_sample_rate: 16000
+  constraints:
+    - kind: max_duration
+      seconds: 240

@@ -1,0 +1,32 @@
+# Role-split cell S-agent: gpt-oss-120b alone on gb10-1's agent-only section,
+# gpt-oss-120b-MXFP4-agent-only (16 slots sharing c 1,179,648). GuideLLM's knee profile sweeps 1,
+# 4, 8, 12 and 16 concurrent sessions, up to the section's slots, 110 s a level, adaptive
+# refinement off, no ramp-up, and estimates the throughput knee from the five levels. The sessions
+# are F-agent's (role-split-agent-full.yaml): GuideLLM's multi-turn synthetic conversation, 4
+# turns, the first 8,192 prompt tokens and the next three 512 each, every turn exactly 512 output
+# tokens, each turn sent when the last one's reply ends (no think time). GuideLLM sends
+# max_completion_tokens with ignore_eos whenever output_tokens is set, so every turn generates its
+# full 512. Engine-neutral: the section and its tokenizer (openai/gpt-oss-120b) are given on the
+# command line, as `cell`'s <section> <tokenizer>, the JSON's path by `cell`, and the target in
+# GUIDELLM__SPEC__BACKEND__TARGET. Run from the repository root.
+spec:
+  backend:
+    kind: openai_http
+    request_format: /v1/chat/completions
+  profile:
+    kind: knee
+    initial_streams: [1, 4, 8, 12, 16]
+    adaptive: false
+    rampup_duration: 0
+  # A session's later turns carry the earlier ones as history, so its last turn reads 8,192 +
+  # 3 x 512 prompt tokens and 3 x 512 replies, 11,264 tokens before its own 512 out.
+  data:
+    - kind: synthetic_text
+      turns: 4
+      first_prompt_tokens: 8192
+      prompt_tokens: 512
+      output_tokens: 512
+  # Each level stops at 110 s; the sessions in flight then are counted incomplete.
+  constraints:
+    - kind: max_duration
+      seconds: 110

@@ -1,0 +1,30 @@
+# Role-split mixed cells F-mixed, S-mixed and S-knee, the agent's process: one of four GuideLLM
+# processes started together, one a purpose, each a constant concurrency for 240 s, under the 10
+# min cap. The full set's agent is set A's section, gpt-oss-120b-MXFP4-set-a; the split's is
+# gb10-1's gpt-oss-120b-MXFP4-agent-only. Each session is F-agent's (role-split-agent-full.yaml):
+# 4 turns, the first 8,192 prompt tokens and the next three 512 each, every turn exactly 512
+# output tokens, no think time. The scenario sets no stream count: each cell gives its own in
+# GUIDELLM__SPEC__PROFILE__STREAMS, which GuideLLM reads into the profile's streams when the file
+# leaves them out (a value in the file would win over the variable), so one file serves F-mixed
+# and S-mixed at the load target, 4, and S-knee at the purpose's split knee:
+# `GUIDELLM__SPEC__PROFILE__STREAMS=4 cell <name> role-split-mixed-agent <section> <tokenizer>`.
+# With none set the run refuses to start. Run directly, GuideLLM's `--profile
+# kind=concurrent,streams=<n>` sets it the same way. Engine-neutral: the section and its tokenizer
+# (openai/gpt-oss-120b) are given on the command line, as `cell`'s <section> <tokenizer>, the
+# JSON's path by `cell`, and the target in GUIDELLM__SPEC__BACKEND__TARGET. Run from the
+# repository root.
+spec:
+  backend:
+    kind: openai_http
+    request_format: /v1/chat/completions
+  profile:
+    kind: concurrent
+  data:
+    - kind: synthetic_text
+      turns: 4
+      first_prompt_tokens: 8192
+      prompt_tokens: 512
+      output_tokens: 512
+  constraints:
+    - kind: max_duration
+      seconds: 240

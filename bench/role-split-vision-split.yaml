@@ -1,0 +1,33 @@
+# Role-split cell S-vision: gemma-4-26B-A4B QAT on gb10-2's 16-slot section,
+# gemma-4-26B-A4B-it-qat-Q4_0-16-slots (16 slots of 8,192 tokens, the prompt cache capped), beside
+# the 16-slot E4B and granite. GuideLLM's knee profile sweeps 1, 4, 8, 12 and 16 concurrent
+# streams, up to the section's slots, 90 s a level, adaptive refinement off, no ramp-up, and
+# estimates the throughput knee from the five levels. The requests are F-vision's
+# (role-split-vision-full.yaml): one synthetic 1440p JPEG beside 200 synthetic text tokens, exactly
+# 100 output tokens. It needs GuideLLM's vision extra, which mise.bench.toml installs.
+# Engine-neutral: the section and its tokenizer (google/gemma-4-26B-A4B-it) are given on the
+# command line, as `cell`'s <section> <tokenizer>, the JSON's path by `cell`, and the target in
+# GUIDELLM__SPEC__BACKEND__TARGET. Run from the repository root.
+spec:
+  backend:
+    kind: openai_http
+    request_format: /v1/chat/completions
+  profile:
+    kind: knee
+    initial_streams: [1, 4, 8, 12, 16]
+    adaptive: false
+    rampup_duration: 0
+  # The two sources are read side by side, one row of each a request: the text, cut to its 200
+  # tokens by the tokenizer, and the image, which carries the request's output tokens. GuideLLM
+  # sends max_completion_tokens with ignore_eos, so every request generates its full 100.
+  data:
+    - kind: synthetic_text
+      prompt_tokens: 200
+    - kind: synthetic_image
+      resolution: 1440p
+      format: jpeg
+      output_tokens: 100
+  # Each level stops at 90 s; the requests in flight then are counted incomplete.
+  constraints:
+    - kind: max_duration
+      seconds: 90
