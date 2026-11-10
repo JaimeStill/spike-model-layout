@@ -77,8 +77,10 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
   preset, and cells on gb10-1 and gb10-2 compare, [`docs/findings/hosts.md`](../docs/findings/hosts.md).
 - **The footprint table:** each set A model's memory on a GB10 and on the Framework, and the
   capacity table placements are computed from, [`docs/findings/footprint.md`](../docs/findings/footprint.md).
-- **Measured sessions and requests** per placed model, at its context.
-- **The full-set and role-split comparison** across the two GB10s.
+- **Measured sessions and requests** per placed model, at its context,
+  [`docs/findings/role-split.md`](../docs/findings/role-split.md).
+- **The full-set and role-split comparison** across the two GB10s,
+  [`docs/findings/role-split.md`](../docs/findings/role-split.md).
 - **The Framework's placement** in the layout.
 - **The vLLM agent comparison** against llama.cpp.
 - **On-demand serving** through llama.cpp's router.
