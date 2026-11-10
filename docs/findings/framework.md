@@ -22,7 +22,9 @@ closes footprint's open items on the Framework's prompt cache, its system-memory
   free throughout (L.1);
 - with the prompt cache capped, the 26B-A4B's RSS on the Framework grew by 1,252 MiB at most,
   against footprint's uncapped 239 → 9,867 MiB, and the system memory the new floor watches never
-  fell under 84.25 GiB (K.2, K.4);
+  fell under 84.25 GiB in the capability arrangement (sections E onward); in the anchors, with
+  gpt-oss-120b set-a loaded, its lowest was 52.04 / 52.17 GiB, still far above the floor (C, K.2,
+  K.4);
 - gb10-1's agent-only host ran 0.30 to 0.36 GiB above its floor at its lowest in the last three
   cells (H, L.5).
 
@@ -59,11 +61,13 @@ Docker are footprint's ([footprint](footprint.md), "Stack, engine and network pa
 updates moved no kernel, driver or Mesa: no container restarted with them.
 
 **Network path.** `tailscale ping -c 1` from the laptop at the stack read: each host via its LAN
-address in 1 ms. A ping
-before every run, each with its date, is in `.state/framework/ping-2026-11-10.txt` (the baseline,
-B-target, B-held, the Framework's arrangement, X-vision, X-audio, X-embed, P-target and P-held)
-and in the anchors' step output (`.state/framework/fw-anchors.out`). Every one answered via the
-host's LAN address, 0 to 2 ms, "direct". **Every run in this finding went direct on the LAN.**
+address in 1 ms. A ping preceded every run. Each is dated in `.state/framework/ping-2026-11-10.txt`
+(the baseline, B-target, B-held, the Framework's arrangement, X-vision, X-audio, X-embed, P-target
+and P-held), except the anchors': their pongs are in the step output
+(`.state/framework/fw-anchors.out`), which carries no date, and the step log's trace of the
+command dates them 16:30:01 (FA) and 16:31:26 (FB) local, 2026-11-10
+(`.state/measure/framework/2026-11-10.log`). Every one answered via the host's LAN address, 0 to
+2 ms, "direct". **Every run in this finding went direct on the LAN.**
 Had the laptop been off the LAN, the relay's trip would have landed on the client-side timing
 figures only (TTFT, request latency, RTFx, requests and prompt tokens a second); the server-side
 figures (ITL, memory, buffers) don't carry the path ([role-split](role-split.md), L.7).
@@ -341,13 +345,13 @@ X-embed, granite (16 slots of 8,192), `bench/role-split-embed.yaml`: 512-token i
 `/v1/embeddings`, concurrent [1, 2, 4, 8, 16], 30 s each, 21:57:46-22:00:57Z. Judged at ≥4,300
 prompt tok/s.
 
-| Streams | Ok / incomplete | Requests/s | Latency median | Prompt tok/s | Floor |
+| Streams | Ok / errored / incomplete | Requests/s | Latency median | Prompt tok/s | Floor |
 | --- | --- | --- | --- | --- | --- |
-| 1 | 760 / 0 | 25.300 | 0.04 s | 12,979 | meets |
-| 2 | 997 / 1 | 33.200 | 0.06 s | 17,032 | meets |
-| 4 | 1296 / 1 | 43.100 | 0.09 s | 22,110 | meets |
-| 8 | 1192 / 8 | 39.733 | 0.20 s | 20,383 | meets |
-| 16 | 1184 / 16 | 39.467 | 0.40 s | 20,246 | meets |
+| 1 | 760 / 0 / 0 | 25.300 | 0.04 s | 12,979 | meets |
+| 2 | 997 / 0 / 1 | 33.200 | 0.06 s | 17,032 | meets |
+| 4 | 1296 / 0 / 1 | 43.100 | 0.09 s | 22,110 | meets |
+| 8 | 1192 / 0 / 8 | 39.733 | 0.20 s | 20,383 | meets |
+| 16 | 1184 / 0 / 16 | 39.467 | 0.40 s | 20,246 | meets |
 
 **Holds 16 streams**, every level met; throughput peaked at 4 streams. The `readout` counted 73,253
 idle-slot saves (L.3); granite's RSS grew 123 → 136 MiB and its GTT 1,102 → 1,149 MiB.
@@ -513,7 +517,7 @@ Framework's gpt-oss section out, which is most of the difference.
 | Footprint's item | Here |
 | --- | --- |
 | The Gemma sections' prompt cache | **Closed on the Framework:** its clone carries the cap (21b5e8c, A), its Gemma sections print `--cache-ram 0` (E), the readouts counted 0 prompt saves, and the 26B-A4B's RSS grew 1,252 MiB at most (237 → 1,489), against footprint's uncapped 239 → 9,867 MiB (K.2). The capped sections' RSS growth itself stays role-split's open item (L.2 there), now seen on Vulkan too. |
-| The Framework's system memory has no floor | **Closed:** `watch` samples system MemAvailable beside GTT on an amdgpu host and stops a cell under 12.5 GiB (B). In every Framework cell the system pool's lowest was 84.25 GiB (P-target), 71.75 GiB above that floor (c). |
+| The Framework's system memory has no floor | **Closed:** `watch` samples system MemAvailable beside GTT on an amdgpu host and stops a cell under 12.5 GiB (B). In the capability arrangement (sections E onward) the system pool's lowest was 84.25 GiB (P-target), 71.75 GiB above that floor (c); in the anchors, with gpt-oss-120b set-a loaded, it was 52.04 / 52.17 GiB (FA / FB, C), still far above it. |
 | The Framework's L2 parser error (`peg-gemma4`) | Open, as role-split widened it: one more on the Framework's capped 26B-A4B (X-vision, 4 streams) and one on gb10-2 (B-target) (L.4). |
 | Unmeasured in the computed columns | Open as role-split left it: the Gemma models' trained contexts. Nothing here reads them. |
 | The E4B's 8,192-token slot against a 15,028-token request | Closed by role-split (E there). |
