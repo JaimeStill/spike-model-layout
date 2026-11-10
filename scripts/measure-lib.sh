@@ -33,20 +33,26 @@
 #   cell <name> <scenario> [<section> <tokenizer>]
 #                                   one GuideLLM cell from bench/<scenario>.yaml, under watch
 #   summarize <name>                a result's figures: a cell's and its watch's
-#   memory                          one memory read-out on the host, and the floor
+#   memory                          one memory read-out on the host, and the floor (on an amdgpu
+#                                   host, GTT and system memory, each with its floor)
 #   routing                         rules.md's routing check: the host's .lan records, what the bare
 #                                   name resolves to, and 50 connects to the router's /health
 #   readout [<since>]               the router's log since a time (default 5 minutes ago), and memory
 #   footprint [<since>]             each llama-server's GPU memory and RSS by alias, the pool, and
 #                                   the load lines that size its buffers (default 10 minutes ago)
 #   watch <name> <command...>       run one command with GPU clocks and memory sampled, readouts
-#                                   at an interval, and the run stopped under the memory floor
+#                                   at an interval, and the run stopped under the memory floor (on
+#                                   an amdgpu host, under either the GTT or the system floor)
 #   image <class> <build>           whether the class's engine image exists for a build (ghcr.io)
 #   gate                            the build gate's loads: every preset section, one at a time
 #
 # Settings, each an environment variable read when a helper runs:
 #   MEASURE_FLOOR_GIB      the memory floor (required by watch): the policy's headroom on the
-#                          probed ceiling, e.g. 12.2 on gb10-1, 11.2 on framework
+#                          probed ceiling, e.g. 12.2 on gb10-1, 11.2 on framework (GTT there)
+#   MEASURE_SYSTEM_FLOOR_GIB  the system-memory floor on an amdgpu host (required by watch there):
+#                          llama.cpp's host prompt cache sits in system memory outside GTT, which
+#                          the GTT floor can't see (footprint finding), e.g. 12.5 on framework
+#                          (10% of its 128,075 MiB)
 #   MEASURE_SAMPLE_EVERY   seconds between watch's samples (default 10)
 #   MEASURE_READOUT_EVERY  seconds between watch's readouts (default 300)
 #   MEASURE_CELL_CAP       a cell's cap (default 10m)
@@ -78,14 +84,16 @@ _MEASURE_ARGS='--(ctx-size|parallel|cache-ram|swa-checkpoints|ctx-checkpoints|ch
 # (GTT free on an amdgpu card, MemAvailable otherwise), then the GPU's clocks and limits:
 # nvidia-smi's SM clock, its maximum, the active throttle reasons (a bitmask; 0x0 is none),
 # temperature, power and utilization on a GB10; amdgpu's current sclk level, busy percent, edge
-# temperature and power on a Strix Halo. It reads only what an unprivileged user can.
+# temperature and power on a Strix Halo. On an amdgpu card a fourth field follows, system
+# MemAvailable in MiB, the pool the GPU's GTT doesn't cover; a GB10's line has three fields, its
+# first already MemAvailable. It reads only what an unprivileged user can.
 # The script runs on the host, so its expansions are meant to stay unexpanded here.
 # shellcheck disable=SC2016
 _MEASURE_SAMPLE='
-avail=$(awk "/^MemAvailable/{print int(\$2/1024)}" /proc/meminfo); src=MemAvailable; gpu=
+mem=$(awk "/^MemAvailable/{print int(\$2/1024)}" /proc/meminfo); avail=$mem; src=MemAvailable; sys=; gpu=
 for d in /sys/class/drm/card*/device; do
   [ -r "$d/mem_info_gtt_total" ] || continue
-  avail=$(( ($(cat "$d/mem_info_gtt_total") - $(cat "$d/mem_info_gtt_used")) / 1048576 )); src=GTT
+  avail=$(( ($(cat "$d/mem_info_gtt_total") - $(cat "$d/mem_info_gtt_used")) / 1048576 )); src=GTT; sys=$mem
   h=$(ls -d "$d"/hwmon/hwmon* 2>/dev/null | head -n 1)
   p=$(cat "$h/power1_average" 2>/dev/null || cat "$h/power1_input" 2>/dev/null)
   gpu="sclk $(awk "/\\*/{print \$2}" "$d/pp_dpm_sclk" 2>/dev/null), busy $(cat "$d/gpu_busy_percent" 2>/dev/null)%, edge $(( $(cat "$h/temp1_input" 2>/dev/null || echo 0) / 1000 )) C, power $(( ${p:-0} / 1000000 )) W"
@@ -95,7 +103,11 @@ if command -v nvidia-smi >/dev/null; then
   gpu=$(nvidia-smi --query-gpu=clocks.sm,clocks.max.sm,clocks_throttle_reasons.active,temperature.gpu,power.draw,utilization.gpu --format=csv,noheader 2>&1 | head -n 1)
   gpu="sm, max sm, throttle, temp, power, util: $gpu"
 fi
-printf "%s\t%s\t%s\n" "$avail" "$src" "${gpu:-no GPU read}"
+if [ -n "$sys" ]; then
+  printf "%s\t%s\t%s\t%s\n" "$avail" "$src" "${gpu:-no GPU read}" "$sys"
+else
+  printf "%s\t%s\t%s\n" "$avail" "$src" "${gpu:-no GPU read}"
+fi
 '
 
 # Turns xtrace off for a poll or a sampling loop, leaving one traced line that says what it does;
@@ -232,13 +244,20 @@ memory() {
     *x*:) _measure_marked memory; return ;;
     *:on) _measure_marking=in; set -x ;;
   esac
-  local line avail src
+  local line avail src sys
   line=$(ssh "$MEASURE_HOST" bash -s <<<"$_MEASURE_SAMPLE") || return 1
-  IFS=$'\t' read -r avail src _ <<<"$line"
+  IFS=$'\t' read -r avail src _ sys <<<"$line"
   awk -v h="$MEASURE_HOST" -v a="$avail" -v s="$src" \
     'BEGIN { printf "memory %s: %.2f GiB available (%s)", h, a / 1024, s }'
   if [[ -n ${MEASURE_FLOOR_GIB-} ]]; then
     printf ', floor %s GiB' "$MEASURE_FLOOR_GIB"
+  fi
+  # An amdgpu host's second pool, system memory, with its own floor.
+  if [[ -n $sys ]]; then
+    awk -v a="$sys" 'BEGIN { printf "; system %.2f GiB available (MemAvailable)", a / 1024 }'
+    if [[ -n ${MEASURE_SYSTEM_FLOOR_GIB-} ]]; then
+      printf ', floor %s GiB' "$MEASURE_SYSTEM_FLOOR_GIB"
+    fi
   fi
   echo
 }
@@ -337,8 +356,10 @@ awk -v kind="$kind" 'NR == FNR { v[$1] = $2; g[$1] = $3; next }
     printf "  %s: pid %s, %s, rss %d MiB\n", $4, $1, m, $2 / 1024 }' \
   <(printf '%s\n' "$gpu") <(printf '%s\n' "$procs")
 if [ "$kind" = amdgpu ]; then
+  # GTT, and beside it system memory, where llama.cpp's host prompt cache sits outside GTT.
   awk -v u="$(cat "$card/mem_info_gtt_used")" -v t="$(cat "$card/mem_info_gtt_total")" \
-    'BEGIN { printf "pool: GTT used %.2f GiB of %.2f GiB\n", u / 2^30, t / 2^30 }'
+    '/^MemAvailable:/ { m = $2 / 2^20 }
+    END { printf "pool: GTT used %.2f GiB of %.2f GiB; system MemAvailable %.2f GiB\n", u / 2^30, t / 2^30, m }' /proc/meminfo
 else
   awk '/^(MemTotal|MemAvailable|Cached):/ { m[$1] = $2 / 2^20 }
     END { printf "pool: MemTotal %.2f GiB, MemAvailable %.2f GiB, Cached %.2f GiB\n", m["MemTotal:"], m["MemAvailable:"], m["Cached:"] }' /proc/meminfo
@@ -371,7 +392,8 @@ watch() {
     *:on) _measure_marking=in; set -x ;;
     *:off) _measure_refuse watch; return ;;
   esac
-  local name=${1:?usage: watch <name> <command...>} floor_mib pid rc t0 next line avail stopped=
+  local name=${1:?usage: watch <name> <command...>} floor_mib sys_floor_mib="" pid rc t0 next line
+  local avail src sys stopped="" floors
   shift
   (($#)) || { echo 'usage: watch <name> <command...>' >&2; return 2; }
   if [[ -z ${MEASURE_FLOOR_GIB-} ]]; then
@@ -379,21 +401,38 @@ watch() {
     return 2
   fi
   floor_mib=$(awk -v g="$MEASURE_FLOOR_GIB" 'BEGIN { printf "%d", g * 1024 }')
+  # One sample before the run tells whether the host reads a second pool (an amdgpu host's system
+  # memory), which then needs its own floor; it isn't written to the samples.
+  line=$(ssh "$MEASURE_HOST" bash -s <<<"$_MEASURE_SAMPLE") || return 1
+  IFS=$'\t' read -r _ src _ sys <<<"$line"
+  floors="$MEASURE_FLOOR_GIB GiB ($src)"
+  if [[ -n $sys ]]; then
+    if [[ -z ${MEASURE_SYSTEM_FLOOR_GIB-} ]]; then
+      echo "watch: $MEASURE_HOST reads system memory beside $src; set MEASURE_SYSTEM_FLOOR_GIB first" >&2
+      return 2
+    fi
+    sys_floor_mib=$(awk -v g="$MEASURE_SYSTEM_FLOOR_GIB" 'BEGIN { printf "%d", g * 1024 }')
+    floors+=" or $MEASURE_SYSTEM_FLOOR_GIB GiB (system MemAvailable)"
+  fi
   t0=$(date -u +%FT%TZ)
-  printf 'time\tavailable MiB\tread\tgpu\n' >"$MEASURE_STATE/$name.watch.tsv"
+  printf 'time\tavailable MiB\tread\tgpu%s\n' "${sys:+$'\t'system MiB}" >"$MEASURE_STATE/$name.watch.tsv"
   "$@" >"$MEASURE_STATE/$name.log" 2>&1 &
   pid=$!
   _measure_quiet "sampling $MEASURE_HOST every ${MEASURE_SAMPLE_EVERY:-10} s into $name.watch.tsv" \
     "(ssh $MEASURE_HOST bash -s <<< \$_MEASURE_SAMPLE), readout every" \
-    "${MEASURE_READOUT_EVERY:-300} s, stop under $MEASURE_FLOOR_GIB GiB; output in $name.log"
+    "${MEASURE_READOUT_EVERY:-300} s, stop under $floors; output in $name.log"
   next=$(($(date +%s) + ${MEASURE_READOUT_EVERY:-300}))
   while kill -0 "$pid" 2>/dev/null; do
     sleep "${MEASURE_SAMPLE_EVERY:-10}"
     line=$(ssh "$MEASURE_HOST" bash -s <<<"$_MEASURE_SAMPLE" 2>/dev/null) || continue
     printf '%s\t%s\n' "$(date -u +%T)" "$line" >>"$MEASURE_STATE/$name.watch.tsv"
-    avail=${line%%$'\t'*}
+    IFS=$'\t' read -r avail src _ sys <<<"$line"
     if [[ $avail =~ ^[0-9]+$ ]] && ((avail < floor_mib)); then
-      stopped="memory floor: ${avail} MiB available under $MEASURE_FLOOR_GIB GiB at $(date -u +%T)"
+      stopped="memory floor: ${avail} MiB available ($src) under $MEASURE_FLOOR_GIB GiB at $(date -u +%T)"
+    elif [[ -n $sys_floor_mib && $sys =~ ^[0-9]+$ ]] && ((sys < sys_floor_mib)); then
+      stopped="system floor: ${sys} MiB available (MemAvailable) under $MEASURE_SYSTEM_FLOOR_GIB GiB at $(date -u +%T)"
+    fi
+    if [[ -n $stopped ]]; then
       echo "$stopped; stopping $name"
       _measure_kill_tree "$pid"
       break
@@ -466,9 +505,13 @@ summarize() {
     echo "exit: $(cat "$MEASURE_STATE/$name.exit")"
   fi
   if [[ -f $MEASURE_STATE/$name.watch.tsv ]]; then
-    awk -F'\t' 'NR > 1 { n++; if (n == 1 || $2 < mn) { mn = $2; at = $1 }; src = $3; g[$4]++ }
+    # The lowest of each pool: the first column's, and on an amdgpu host system memory's beside it.
+    awk -F'\t' 'NR > 1 { n++; if (n == 1 || $2 < mn) { mn = $2; at = $1 }; src = $3; g[$4]++
+                         if ($5 != "") { k++; if (k == 1 || $5 < ms) { ms = $5; sat = $1 } } }
       END { if (!n) { print "watch: no samples"; exit }
-            printf "watch: %d samples, lowest available %.2f GiB (%s) at %s\n", n, mn / 1024, src, at }' \
+            printf "watch: %d samples, lowest available %.2f GiB (%s) at %s", n, mn / 1024, src, at
+            if (k) printf "; lowest system %.2f GiB (MemAvailable) at %s", ms / 1024, sat
+            print "" }' \
       "$MEASURE_STATE/$name.watch.tsv"
     # The GPU readings, clocks and throttle reasons, each distinct reading with its count.
     tail -n +2 "$MEASURE_STATE/$name.watch.tsv" | cut -f4 | sort | uniq -c | sort -rn | head -n 8 |
