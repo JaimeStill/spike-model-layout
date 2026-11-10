@@ -729,8 +729,8 @@ meet the floor on the median (RTFx ≥5) and miss it on about a fifth of their r
 
 **The server's figures.** Each request's timings from gb10-2's router log, read-only, over each run's
 1-stream window (the child's `print_timing` lines, its `audio decoded` lines, and the router's
-`proxying request` line before each task). Medians, from
-`.state/role-split/audio-diag-gb10-2-2026-11-10.txt`:
+`proxying request` line before each task), saved in `.state/role-split/router-log-<run>-2026-11-10.txt`
+and read with `bench/srvtimes.awk` (section M). Medians:
 
 | Run | Requests timed | n_ctx_slot | Audio encode | Prompt eval (tokens) | Eval (ms a token) | Total | Router proxy → slot start | Release → next proxy |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -1163,13 +1163,21 @@ vision extract, with awk (16:34:24Z); `med` prints the count, min, median (inter
 med='{a[NR]=$1} END{k=(NR-1)*0.5; lo=int(k); hi=(lo+1<NR-1)?lo+1:NR-1; printf "n %d, min %s, median %.2f, max %s\n", NR, a[1], a[lo+1]+(a[hi+1]-a[lo+1])*(k-lo), a[NR]}'; V=.state/role-split/vision-encode-gb10-2-2026-11-10.log; grep -c 'encoding mtmd batch' $V; awk '/^\[/ {split($2,t,"."); s=t[1]*60+t[2]+t[3]/1000+t[4]/1e6} /encoding mtmd batch/ {if (open) overlaps++; open=1; e=s} /decoding image batch/ && open {printf "%.6f\n", s-e; open=0} END {print "overlaps " overlaps+0 > "/dev/stderr"}' $V | sort -n | awk "$med"; grep -o 'image decoded (batch 1/1) in [0-9]* ms' $V | awk '{print $(NF-1)}' | sort -n | awk "$med"
 ```
 
-Section L.7's server timings, from the project's root, at 15:20:41Z (read-only: `docker logs` on
-gb10-2), each window a run's 1-stream level from its JSON and each port the E4B child serving it
-(F-audio 52027, S-audio 44615, D1 34633, D2 52363). `.state/role-split/audio-diag-gb10-2-2026-11-10.txt`
-holds each command before what it printed:
+Section L.7's server timings. Each run's 1-stream window of gb10-2's router log, the window from
+the level's start and end in its JSON, saved at 16:37:55Z (read-only: `docker logs` on gb10-2,
+nothing loaded, unloaded or requested) into `.state/role-split/router-log-<run>-2026-11-10.txt`,
+each file's first line the read that filled it:
 
 ```sh
-ssh gb10-2 'docker logs --timestamps --since <start> --until <end> llama 2>&1' | python3 -I .state/role-split/srvtimes.py <port>
+date -u +%FT%TZ; for w in "f-audio 2026-11-10T12:13:18Z 2026-11-10T12:13:48Z" "s-audio 2026-11-10T14:30:56Z 2026-11-10T14:31:26Z" "d1-audio 2026-11-10T15:15:20Z 2026-11-10T15:16:21Z" "d2-audio 2026-11-10T15:17:34Z 2026-11-10T15:18:35Z"; do set -- $w; c="ssh gb10-2 'docker logs --timestamps --since $2 --until $3 llama 2>&1'"; o=.state/role-split/router-log-$1-2026-11-10.txt; { echo "# $c"; eval "$c"; } > $o; echo "$o $(wc -l < $o)"; done
+```
+
+Then read with [`bench/srvtimes.awk`](../../bench/srvtimes.awk) and
+[`bench/stats.awk`](../../bench/stats.awk) (16:39:03Z, output to the scratch directory), each port
+the E4B child serving the run (F-audio 52027, S-audio 44615, D1 34633, D2 52363):
+
+```sh
+date -u +%FT%TZ; for p in "f-audio 52027" "s-audio 44615" "d1-audio 34633" "d2-audio 52363"; do set -- $p; echo "## $1"; awk -v port=$2 -f bench/srvtimes.awk .state/role-split/router-log-$1-2026-11-10.txt | sort -k1,1n -k3,3g | awk -f bench/stats.awk; done > <scratchpad>/srvtimes-awk.txt
 ```
 
 L.7's client timings (16:34:20Z, with the per-level tables) and its first 30 s column (16:36:01Z),

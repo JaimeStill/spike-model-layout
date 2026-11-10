@@ -96,3 +96,15 @@ table starts with the knee GuideLLM concluded, when the profile reports one. `--
 prints instead GuideLLM's own per-request timings for one level (`--argjson level <i>`, default
 the first): the gap between requests, request start to first streamed chunk, streaming, and audio
 bytes. Medians and percentiles interpolate linearly between the two nearest ranks.
+
+## Reading the router log: `srvtimes.awk`
+
+[`srvtimes.awk`](srvtimes.awk) reads llama-server's router log (`docker logs --timestamps llama`,
+saved to a file) for one child port and prints each timed request's server figures: the audio
+encode, prompt eval, eval, total, the router's proxy line to the slot's start, and the previous
+release to the next proxy line. [`stats.awk`](stats.awk) gives each figure's count, median
+(interpolated as `levels.jq` does), min and max:
+
+```sh
+awk -v port=<port> -f bench/srvtimes.awk <log> | sort -k1,1n -k3,3g | awk -f bench/stats.awk
+```
