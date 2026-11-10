@@ -37,8 +37,8 @@ The stack is the footprint finding's in every column ([footprint](footprint.md),
 and network path"). The root updates (section A) moved no kernel, driver, CUDA or toolkit.
 
 **Network path.** `tailscale ping -c 1` from the laptop, before and after the updates: gb10-1 via
-192.168.1.216, 2 ms both times; gb10-2 via 192.168.1.138, 0 s then 1 ms. Both direct on the LAN for
-slice 1 (the anchors and the full-set arm). The laptop then moved off the LAN: read again at
+its LAN address, 2 ms both times; gb10-2 via its LAN address, 0 s then 1 ms. Both direct on the LAN
+for slice 1 (the anchors and the full-set arm). The laptop then moved off the LAN: read again at
 2026-11-10T10:23:54-05:00 (15:23:54Z), after D1 and D2, gb10-1 answered via DERP(nyc) in 56 ms and
 gb10-2 via DERP(iad) in 61 ms (112 ms at a read a minute earlier), "direct connection not
 established" (`.state/role-split/ping-1023.txt`). No ping was recorded between 11:33Z and 15:23Z, so
@@ -88,8 +88,9 @@ request misses.
 (`ssh <host> sudo -n /usr/sbin/sysctl vm.drop_caches=3`), against the floor of 12.2 GiB on both
 GB10s. `watch`'s samples during a cell are not taken after a drop. The logs give buffers in MiB;
 pools are in GiB (1 GiB = 1024 MiB). The command lists show the step logs' local times (UTC−5);
-the prose gives UTC. Figures marked **(m)** are measured; **(c)** are computed from measured
-figures, with the arithmetic shown.
+the prose gives UTC. Every figure is measured, read from a cell's JSON, the step log or a saved
+file, unless marked **(c)**: computed from measured figures, with the arithmetic shown where it
+isn't a plain difference. **(m)** marks a measured figure where computed ones sit beside it.
 
 ## A. Hosts brought current, and the preset change (Behaviors 1, 2)
 
@@ -155,14 +156,14 @@ sections loaded in turn (45.3, 15.1, 9.1, 3.1 s; last at 11:52:15Z), idle 30 s, 
 read at 11:52:46Z. Then F-L2: footprint's L2 unchanged (`bench/footprint-l2.yaml`, vision-b at
 1440p: 4 streams × 32 requests, one 1440p JPEG beside 200 text tokens, 64 out), 112 s.
 
-**Set A idle, capped (m):** 21.57 GiB available, 9.37 GiB above the floor (footprint's gb10-1:
+**Set A idle, capped (m):** 21.57 GiB available, 9.37 GiB above the floor (c) (footprint's gb10-1:
 21.45). Each process read footprint's set A figures within 4 MiB: gpt-oss set-a 64911 / 1261 MiB
 (GPU / RSS), 26B-A4B 18015 / 1214, E4B 6530 / 4141, granite 863 / 827; router 170 / 340. Every
 logged buffer line matched footprint's section C line for line: the cap keys change no logged
 buffer.
 
 **F-L2 (m):** 31 of 32 requests ok, 1 errored; 20.68 output tok/s; TTFT median 10,244 ms; ITL
-median 26.45 ms. The pool's lowest during the cell was **17.80 GiB** (11:53:47Z), 5.60 GiB above
+median 26.45 ms. The pool's lowest during the cell was **17.80 GiB** (11:53:47Z), 5.60 GiB (c) above
 the floor; 18.08 GiB after it. The `readout` counted 0 idle-slot saves, 0 prompt saves and 96
 context checkpoints.
 
@@ -171,11 +172,11 @@ context checkpoints.
 | Outcome | stopped by `watch` at 61 s, 12 of 32 complete | ran to its end, 31 ok, 1 errored |
 | Pool lowest | 10.39 GiB (under the floor) | 17.80 GiB |
 | 26B-A4B GPU, idle → after | 18015 → 18828 MiB | 18015 → 18828 MiB |
-| 26B-A4B RSS, idle → after | 1217 → 10397 MiB (+9180) | 1214 → 3526 MiB (+2312) |
+| 26B-A4B RSS, idle → after | 1217 → 10397 MiB (+9180, c) | 1214 → 3526 MiB (+2312, c) |
 | Idle-slot / prompt saves | 30 / 40 | 0 / 0 |
 
 So **the cap holds set A above the floor under L2**, and the 26B-A4B's RSS still grew by 2312 MiB,
-a quarter of footprint's growth, with no save counted (section L.2). The errored request was
+a quarter (c) of footprint's growth, with no save counted (section L.2). The errored request was
 llama.cpp's Gemma 4 output parser, not memory (section L.4). By the architect's decision F-L2 was
 not rerun: 31 of 32 meets Behavior 4 on memory.
 
@@ -276,7 +277,7 @@ F-audio, gb10-2, set A's E4B (c 32768, 4 slots), levels [1, 2, 3, 4, 8], 12:13:1
 | 4 | 64 / 0 / 0 | 58.39 | 379 ms | 45.22 ms | 1.02 / 1.90 s | 4.97 / 2.13 | 32 of 64 | 20 s | **misses** |
 | 8 | 64 / 0 / 0 | 61.02 | 1473 ms | 44.64 ms | 2.25 / 3.16 s | 2.43 / 0.98 | 4 of 64 | 20 s | **misses** |
 
-**Holds 3 requests.** Level 4's median RTFx, 4.97, is under the floor by 0.03; half its requests
+**Holds 3 requests.** Level 4's median RTFx, 4.97, is under the floor by 0.03 (c); half its requests
 met it.
 
 S-audio, gb10-2, the 16-slot E4B (c 131072, 16 slots of 8192), levels [1, 4, 8, 12, 16],
@@ -361,7 +362,7 @@ computation, and what the capability GB10 leaves free.
 
 **gb10-1: the agent-only section alone.** `unload --all`, cache dropped (117.70 GiB available),
 `gpt-oss-120b-MXFP4-agent-only` loaded in 51.3 s (14:10:20-14:11:11Z), idle 30 s, cache dropped and
-read at 14:11:42Z: **13.59 GiB available (m), 1.39 GiB above the floor**; 104.11 GiB taken (c:
+read at 14:11:42Z: **13.59 GiB available (m), 1.39 GiB above the floor (c)**; 104.11 GiB taken (c:
 117.70 − 13.59). Process 102925 MiB GPU, 2419 MiB RSS; router 170 / 346. Cached after the drop
 2.45 GiB.
 
@@ -392,7 +393,7 @@ the same 1,179,648 tokens as one unified pool over 16 slots.
 
 **gb10-2: the capability host.** `unload --all`, cache dropped (117.60 GiB available), the 16-slot
 26B-A4B (13.2 s), the 16-slot E4B (10.0 s) and granite (3.8 s) loaded, 14:10:34-14:11:01Z, idle
-30 s, cache dropped and read at 14:11:33Z: **77.40 GiB available (m), 65.20 GiB above the floor**;
+30 s, cache dropped and read at 14:11:33Z: **77.40 GiB available (m), 65.20 GiB above the floor (c)**;
 40.20 GiB taken (c). Processes (GPU / RSS, MiB): 26B-A4B 16-slot 25335 / 1231, E4B 16-slot 8546 /
 4157, granite 863 / 827; router 170 / 561.
 
@@ -404,14 +405,14 @@ session's F arm):
 | Weights GPU / host | 13755.42 / 577.50 | the same | 4788.12 / 3536.00 | the same |
 | Projector | 1139.46 | the same | 533.83 | the same |
 | Full-attention KV | 2560.00 (8192 cells, 5 layers, 16/16 seqs) | 640.00 (4/4 seqs) | 2048.00 (8192 cells, 4 layers, 16/16 seqs) | 512.00 (4/4 seqs) |
-| Sliding-window KV | 7200.00 (2304 cells, 25 layers, 16/16 seqs): 450 a slot | 1800.00: 450 a slot | 640.00 (1024 cells, 20 layers, 16/16 seqs): 40 a slot | 160.00: 40 a slot |
+| Sliding-window KV | 7200.00 (2304 cells, 25 layers, 16/16 seqs): 450 a slot (c) | 1800.00: 450 a slot (c) | 640.00 (1024 cells, 20 layers, 16/16 seqs): 40 a slot (c) | 160.00: 40 a slot (c) |
 | Compute GPU / host | **335.29 / 70.61** | 335.29 / 70.61 | **137.02 / 50.03** | 137.02 / 50.03 |
 | Projector compute GPU / CPU | **150.63 / 6.77** | 150.63 / 6.77 | **101.27 + 101.19 / 6.77 + 1.58** | the same |
 | Output (host) | 16.00 | 4.00 | 16.00 | 4.00 |
 | Projector worst case (estimate) | 1296.85 | 1296.85 | 746.89 | 746.89 |
 
 **The Gemma compute buffers at 16 slots equal their 4-slot figures**, model and projector, on both
-sections; KV scales with slots (20,480 and 16,384 B/token × 131,072, exactly). The GPU figures are
+sections; KV scales with slots (c: 20,480 and 16,384 B/token × 131,072, exactly). The GPU figures are
 the logged GPU buffers plus 194.20 MiB (26B-A4B: 25335 − 25140.80) and 196.57 MiB (E4B: 8546 −
 8349.43) (c), the contexts footprint measured.
 
@@ -484,8 +485,8 @@ tokens stay computed (footprint I.4, I.7). The E4B's slot does not take a 10-min
 | **Per-stream speed, agent** | 1 session ITL 19.78 ms; 4 sessions 54.42 ms alone, 237.67 ms mixed | 1 session 19.57 ms; 4 sessions 50.97 ms alone, 50.76 ms mixed |
 | **Per-stream speed, vision** | 1 stream 3.99 s; 4 streams 13.03 s alone, 51.77 s mixed | 1 stream 4.32 s alone, 10.14 s mixed; 4 streams 13.26 s alone, 38.90 s mixed |
 | **Per-stream speed, audio** | 1 stream RTFx 11.11; 4 streams 4.97 alone, 0.80 mixed | 1 stream 6.12 alone, 2.26 mixed; 4 streams 3.84 alone, 0.98 mixed |
-| **Memory left, idle** | gb10-2 21.57 GiB (9.37 above the floor); gb10-1 free for another role | gb10-1 13.59 GiB (1.39 above); gb10-2 77.40 GiB (65.20 above) |
-| **Memory left, lowest under load** | gb10-2 15.86 GiB (F-mixed; 3.66 above) | gb10-1 12.47 GiB (S-knee; 0.27 above); gb10-2 68.69 GiB (S-mixed; 56.49 above) |
+| **Memory left, idle** | gb10-2 21.57 GiB (9.37 above the floor, c); gb10-1 free for another role | gb10-1 13.59 GiB (1.39 above, c); gb10-2 77.40 GiB (65.20 above, c) |
+| **Memory left, lowest under load** | gb10-2 15.86 GiB (F-mixed; 3.66 above, c) | gb10-1 12.47 GiB (S-knee; 0.27 above, c); gb10-2 68.69 GiB (S-mixed; 56.49 above, c) |
 | **Errors** | 1 parser error in F-L2, 3 in F-vision; 1 JSON decode in F-agent | 3 parser errors in S-vision; 2 JSON decode in S-agent |
 
 So, at the load targets, the split held the agent where the full set did not (ITL 50.76 against
@@ -503,11 +504,11 @@ replaces one of its computed assumptions, K.4 says so.
 
 ### K.1 Buffers (m, MiB, logged at load)
 
-| Section | Weights GPU / host | Full-attention KV | Per 1,000 tokens | Sliding-window KV | Compute GPU / host | Projector compute GPU / CPU | Output |
+| Section | Weights GPU / host | Full-attention KV | Per 1,000 tokens (c) | Sliding-window KV | Compute GPU / host | Projector compute GPU / CPU | Output |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | gpt-oss-120b agent-only (c 1,179,648 × 16, unified) | 59851.68 / 586.82 | 41472.00 | 35.16 (36,864 B/token) | 90.00 for the unified pool at 16 slots | **1316.68 / 1249.18** | – | 12.27 |
-| 26B-A4B 16 slots (c 131,072, 8,192 a slot) | 13755.42 / 577.50 | 2560.00 | 19.53 (20,480 B/token) | 450 a slot | **335.29 / 70.61** | 150.63 / 6.77 | 16.00 |
-| E4B 16 slots (c 131,072, 8,192 a slot) | 4788.12 / 3536.00 | 2048.00 | 15.63 (16,384 B/token) | 40 a slot | **137.02 / 50.03** | 202.46 / 8.35 | 16.00 |
+| 26B-A4B 16 slots (c 131,072, 8,192 a slot) | 13755.42 / 577.50 | 2560.00 | 19.53 (20,480 B/token) | 450 a slot (c: 7200.00 / 16) | **335.29 / 70.61** | 150.63 / 6.77 | 16.00 |
+| E4B 16 slots (c 131,072, 8,192 a slot) | 4788.12 / 3536.00 | 2048.00 | 15.63 (16,384 B/token) | 40 a slot (c: 640.00 / 16) | **137.02 / 50.03** | 202.46 / 8.35 (c: 101.27 + 101.19, 6.77 + 1.58) | 16.00 |
 | 26B-A4B and E4B 4 slots, capped | footprint's I.1 rows, unchanged by the cap keys | | | | | | |
 
 ### K.2 Process and pool (m)
@@ -515,7 +516,7 @@ replaces one of its computed assumptions, K.4 says so.
 Process figures GPU / RSS in MiB. "Warmed" is the process after its first cell in the arm (no
 P-cell warm-up ran in this task); "under load" is the highest after any cell in the arm.
 
-| Section | Arm, host | Idle in the arm (m) | Warmed: after its first cell (m) | Under load: highest after a cell (m) | RSS growth, idle → highest |
+| Section | Arm, host | Idle in the arm (m) | Warmed: after its first cell (m) | Under load: highest after a cell (m) | RSS growth, idle → highest (c) |
 | --- | --- | --- | --- | --- | --- |
 | 26B-A4B 4 slots, capped | full set, gb10-2 | 18015 / 1214 | 18828 / 3526 (F-L2) | 18830 / 3723 (F-mixed) | +2509 |
 | E4B 4 slots, capped | full set, gb10-2 | 6530 / 4141 | 6760 / 4831 (F-audio) | 6760 / 4923 (F-probe) | +782 |
@@ -528,7 +529,7 @@ P-cell warm-up ran in this task); "under load" is the highest after any cell in 
 
 ### K.3 Per host and arrangement (m)
 
-| Arrangement | Host | Before load | Idle, 30 s | Taken (c) | Lowest under load | Above the floor, idle / lowest |
+| Arrangement | Host | Before load | Idle, 30 s | Taken (c) | Lowest under load | Above the floor, idle / lowest (c) |
 | --- | --- | --- | --- | --- | --- | --- |
 | Set A, Gemma capped | gb10-2 | 117.80 GiB | 21.57 GiB | 96.23 GiB | 15.86 GiB (F-mixed) | 9.37 / 3.66 GiB |
 | Agent-only, c 1,179,648 × 16 | gb10-1 | 117.70 GiB | 13.59 GiB | 104.11 GiB | 12.47 GiB (S-knee) | 1.39 / 0.27 GiB |
@@ -550,7 +551,7 @@ P-cell warm-up ran in this task); "under load" is the highest after any cell in 
 ### L.1 Vision answers about 0.23 requests a second, whatever the streams: one image encode at a time
 
 In both arms the 26B-A4B's requests a second stayed between 0.222 and 0.267 from 1 stream to 12,
-and output tok/s between 22.22 and 26.67 (D.2). TTFT grew by about 2.5 to 2.6 s for each stream
+and output tok/s between 22.22 and 26.67 (D.2). TTFT grew by about 2.5 to 2.6 s (c) for each stream
 added: F-vision 2686, 5295, 7861, 10,419 ms at 1 to 4 streams; S-vision 2951 ms at 1, 10,653
 at 4, 20,588 at 8, 30,786 at 12.
 
@@ -635,7 +636,7 @@ CUDA0 backend`).
 With `cache-ram 0` and `cache-idle-slots false`, the readouts counted 0 idle-slot saves and 0 prompt
 saves on every Gemma cell, yet the 26B-A4B's RSS grew 1214 → 3723 MiB in the full set and 1231 →
 7369 MiB in the split (16 slots), and the E4B's 4141 → 4923 and 4157 → 5331 MiB (K.2). GPU memory
-grew by at most 815 MiB a process. The readouts counted context checkpoints (96 in F-L2, 421 in
+grew by at most 815 MiB a process (c). The readouts counted context checkpoints (96 in F-L2, 421 in
 S-vision); what holds the RSS growth is not read here. The F-vision read (3215 MiB) came after
 F-L2's (3526 MiB), so it does not only grow.
 
@@ -670,7 +671,7 @@ S-agent 2 (12 streams). Anchor B's one is what put its first run outside parity 
   slot count alone: it doesn't explain it.
 - **Agent at 8 sessions.** S-agent's 8 sessions missed at ITL 109.63 ms and TTFT 25,279 ms, where
   F-agent's 8 met at 68.66 ms and 18,137 ms. set-a has 4 slots, so F-agent's 8 streams exceed its
-  slots; the agent-only section serves 16. At 4 sessions the two were within 3.5 ms of ITL apart
+  slots; the agent-only section serves 16. At 4 sessions the two were within 3.5 ms (c) of ITL apart
   (54.42 and 50.97 ms) and at 1 session within 0.21 ms.
 - **The capability host under its own mix.** In S-knee, 1 vision stream took 10.14 s against
   4.32 s alone, and 1 audio stream ran at RTFx 2.26 against 6.12 alone, with granite at 16 streams
@@ -718,9 +719,10 @@ ended by 30 s into the level):
 | **D1** (15:15:20Z) | 4-slot, alone | 59 / 0 / 1 in 60 s | 18.48 | 495 ms | 22.18 ms | 0.85 / 1.37 s | 6.43 / 3.62 | 48 of 59 | 25, 6.70 / 3.62 |
 | **D2** (15:17:34Z) | 16-slot, alone | 58 / 0 / 0 in 60 s | 18.23 | 516 ms | 21.87 ms | 0.86 / 1.45 s | 6.53 / 3.33 | 45 of 58 | 25, 6.55 / 3.33 |
 
-**D1 and D2 match**, within 21 ms of TTFT and 0.1 of RTFx, and both sit with S-audio, not with
+**D1 and D2 match**, within 21 ms of TTFT and 0.1 of RTFx (c), and both sit with S-audio, not with
 F-audio: set A's own 4-slot section, alone and freshly loaded, ran as slowly as the split's. Both
-meet the floor on the median (RTFx ≥5) and miss it on about a fifth of their requests.
+meet the floor on the median (RTFx ≥5) and miss it on about a fifth of their requests (c: 11 of
+59, 13 of 58).
 
 **The server's figures.** Each request's timings from gb10-2's router log, read-only, over each run's
 1-stream window (the child's `print_timing` lines, its `audio decoded` lines, and the router's
