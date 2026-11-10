@@ -218,6 +218,7 @@ Door          two-way: the pull request reverts by commit, and its
 - Slice 1 done (no tracked change beyond 5842e6d): stack read; role-split pushed to both GB10s as hosts-next, clones on `hosts`, routers restarted; anchors A and B on both (B missed once at 2.71% on one errored request, repeat within noise: parity holds); full-set arm on gb10-2, every cell completed above the floor. Raw output in `.state/measure/gb10-{1,2}/2026-11-10.log` and `.state/role-split/`. gb10-2 serves capped set A, gb10-1 nothing loaded.
 - Escalation answered.
 - Slice 2 done (no tracked change): the split loaded (gb10-1 agent-only 1.39 GiB above its floor idle, 0.27 GiB under load; gb10-2 77.40 GiB available), S-agent/S-vision/S-audio, S-mixed and S-knee all completed above the floor; hosts end as Behavior 12 states. Next: slice 3, the finding and docs.
+- Slice 3 done: 89f31bc (finding, layout, README links) and dce714c (vision encode evidence). Next: the audio diagnostic pair (escalation 2), then reviews and the walkthrough.
 
 ## Decisions
 
@@ -315,6 +316,9 @@ Door          two-way: the pull request reverts by commit, and its
 - role-split (BUILD, escalation): F-L2's 31 of 32 meets Behavior 4 on memory (lowest 17.80 GiB); the one Gemma 4 output-parser error ("does not match the expected peg-gemma4 format") is recorded as a finding, not caused by the cap, and F-L2 isn't rerun (the architect).
 - role-split (BUILD): where GuideLLM found no knee (S-agent, S-audio), "holds" is the highest level meeting the floor; vision and audio floors are judged on each level's median (latency; per-request RTFx = audio seconds / request time), with p90, minimum and the count meeting the floor reported beside them.
 - role-split (BUILD): the split's mixed cells ran each host's processes from its own step script, both launched together.
+- role-split (BUILD, escalation 2): the split's single-stream audio slowdown is diagnosed in this task by a back-to-back pair on gb10-2 (set A's 4-slot E4B alone, then the 16-slot E4B alone, 1 stream, 60 s each, fresh loads), then gb10-2 returns to Behavior 12's state; the finding gains the pair (the architect).
+- role-split (BUILD, escalation 2): agent-vllm widens to the vision, audio and embedding models on vLLM, each in its own process, alone and together on the capability GB10, as a pending roadmap edit decided in its plan round (the architect).
+- role-split (BUILD, escalation 2): several llama.cpp vision processes in place of more slots is not pursued: more processes add load on the shared GPU's compute and bandwidth. The open question is the best inference path for vision and audio, likely each in its own vLLM process, embeddings too (the architect).
 
 ## Pending edits
 
@@ -330,3 +334,4 @@ Door          two-way: the pull request reverts by commit, and its
 - coordinator · intake note (roadmap.toml, the comment "Inputs to sizing set A's slots"): the vision line's ~477 tokens a page is the model's default image-max-tokens on ggml-org's weights; on the QAT section, `image-min-tokens = 560` and `ub = 1120` put an image at 560 to 1,120 tokens. The audio line's 32,768-token context is the E4B section's total; each of its 4 slots holds 8,192 tokens, under the 10-minute WAV's 15,028 (spike-model-layout `docs/findings/footprint.md`, section I.6; sizing that request is role-split's).
 - spike-model-engines · intake note: `docs/engines/llama.cpp/models.md` (outside host/) does not list role-split's three new sections or the Gemma cap keys; measure-lib's `gate` on a Framework clone carrying them would load the 16-slot 26B-A4B section, which aborts on Vulkan past 4 slots.
 - spike-model-engines · intake note: granite's section sets no cache keys, so every embedding request saves its idle slot to the prompt cache (177,658 saves in one 2.5-min sweep on gb10-2); `cache-idle-slots = false` and `cache-ram = 0` would stop it (spike-model-layout `docs/findings/role-split.md`).
+- coordinator · roadmap.toml, experiment.hosting.spike-model-layout task agent-vllm (and README path 5): widen it from gpt-oss-120b alone to the vision (Gemma 4 26B-A4B), audio (E4B) and embedding (granite) models on vLLM in containers, each in its own process, alone and together on the capability GB10, against llama.cpp; role-split found llama-server b12098 encodes images one slot at a time (~0.23 req/s whatever the slots) and vision and audio missing their floors together (`docs/findings/role-split.md`, L.1, N).
