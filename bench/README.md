@@ -9,7 +9,8 @@ the target in `GUIDELLM__SPEC__BACKEND__TARGET`. Each file's header gives its lo
 - `anchor-a.yaml`, `anchor-b.yaml`: the anchors, copied from spike-model-engines.
 - `footprint-*.yaml`: the footprint task's cells
   ([`docs/findings/footprint.md`](../docs/findings/footprint.md)).
-- `role-split-*.yaml`: the role-split task's cells, below.
+- `role-split-*.yaml`: the role-split task's cells, below, which the framework task's cells reuse
+  unchanged.
 
 ## Role-split's cells
 
@@ -81,6 +82,33 @@ watch role-split-f-probe curl -sS -o "$MEASURE_STATE/role-split-f-probe.response
 The finding quotes the saved body: its usage (input tokens, against 15,028) and the time, or its
 error as returned.
 
+## The framework task's cells
+
+The framework task ([`docs/findings/framework.md`](../docs/findings/framework.md)) added no
+scenario: every cell reads an existing file, and the mixed cells give their streams in
+`GUIDELLM__SPEC__PROFILE__STREAMS`, as above. On the Framework, `cell` runs under `watch` with
+both of its floors set, `MEASURE_FLOOR_GIB=11.2` (GTT) and `MEASURE_SYSTEM_FLOOR_GIB=12.5` (system
+memory); `watch` refuses to start there without the second.
+
+| Cell | Host | Scenario | Section | Tokenizer | Streams |
+| --- | --- | --- | --- | --- | --- |
+| FA | framework | `anchor-a.yaml` | `gpt-oss-120b-MXFP4-set-a`, freshly loaded alone | `openai/gpt-oss-120b` | the file's: 1 |
+| FB | framework | `anchor-b.yaml` | as FA | as FA | the file's: 4 |
+| X-vision | framework | `role-split-vision-full.yaml`, knee [1,2,3,4,8] | `google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0` | `google/gemma-4-26B-A4B-it` | the file's levels |
+| X-audio | framework | `role-split-audio-full.yaml`, knee [1,2,3,4,8] | `ggml-org/gemma-4-E4B-it-GGUF:Q8_0` | `google/gemma-4-E4B-it` | the file's levels |
+| X-embed | framework | `role-split-embed.yaml`, concurrent [1,2,4,8,16] | `mrutkows/granite-embedding-english-r2-GGUF:BF16` | `ibm-granite/granite-embedding-english-r2` | the file's levels |
+| B-target | gb10-1; gb10-2 | `role-split-mixed-agent.yaml`; `-vision`, `-audio`, `-embed` | gb10-1 `gpt-oss-120b-MXFP4-agent-only`; gb10-2 its 16-slot 26B-A4B and E4B and granite | as each section above | agent 4; vision 4, audio 4, embedding 16 |
+| B-held | as B-target | as B-target | as B-target | as B-target | agent 4; vision 1, audio 1, embedding 16 |
+| P-target | gb10-1; gb10-2; framework | as B-target, and `-vision`, `-audio`, `-embed` on the Framework | as B-target, and the Framework's three sections as in X-vision, X-audio, X-embed | as above | agent 4; on each capability host vision 2, audio 2, embedding 8 |
+| P-held | as P-target | as P-target | as P-target | as P-target | agent 4; on each capability host vision 1, audio 1, embedding 8 |
+
+Each mixed cell's processes start together, each host's from its own step file: four in B-target
+and B-held, seven in P-target and P-held. For example, P-held's vision process on the Framework:
+
+```sh
+GUIDELLM__SPEC__PROFILE__STREAMS=1 cell framework-p-held-vision role-split-mixed-vision google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0 google/gemma-4-26B-A4B-it
+```
+
 ## Reading the results: `levels.jq`
 
 [`levels.jq`](levels.jq) turns GuideLLM's result JSON into the findings' per-level tables, one
@@ -93,7 +121,10 @@ jq -r --arg purpose agent -f bench/levels.jq .state/measure/gb10-2/role-split-f-
 `purpose` is `agent`, `vision`, `audio` or `embed`, and sets the floor each level is judged by:
 ITL median ≤100 ms, request latency median ≤10 s, RTFx median ≥5 (each request's clip seconds over
 its request time), or mean prompt tok/s ≥4,300; a level with no successful request misses. Each
-table starts with the knee GuideLLM concluded, when the profile reports one. With
+table starts with the knee GuideLLM concluded, when the profile reports one. Each row gives the
+request latency's median, p90 and minimum, and, for `vision`, the count of requests at ≤10 s, as
+it gives the count at RTFx ≥5 for audio: the per-request reading of the floor beside the median's
+verdict. With
 `--arg purpose client`, it prints GuideLLM's own per-request timings for one level instead
 (`--argjson level <i>`, default the first): the gap between requests, the time from request start
 to the first streamed chunk, the streaming time, and the audio bytes. Medians and percentiles interpolate linearly between the two nearest ranks.

@@ -81,7 +81,8 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
   [`docs/findings/role-split.md`](../docs/findings/role-split.md).
 - **The full-set and role-split comparison** across the two GB10s,
   [`docs/findings/role-split.md`](../docs/findings/role-split.md).
-- **The Framework's placement** in the layout.
+- **The Framework's placement** in the layout, as a second capability host beside gb10-2,
+  [`docs/findings/framework.md`](../docs/findings/framework.md).
 - **The vLLM agent comparison** against llama.cpp.
 - **On-demand serving** through llama.cpp's router.
 - **Two-node serving** over QSFP with vLLM and Ray.
