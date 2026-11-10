@@ -24,6 +24,7 @@ the target in `GUIDELLM__SPEC__BACKEND__TARGET`. Each file's header gives its lo
 | S-vision | `role-split-vision-split.yaml` | `gemma-4-26B-A4B-it-qat-Q4_0-16-slots` | `google/gemma-4-26B-A4B-it` |
 | S-audio | `role-split-audio-split.yaml` | `gemma-4-E4B-it-Q8_0-16-slots` | `google/gemma-4-E4B-it` |
 | F-mixed, S-mixed, S-knee | `role-split-mixed-agent.yaml`, `-vision`, `-audio`, `-embed` | each arm's section for the purpose, as above | as above |
+| Walkthrough (slice 4) | `role-split-walk-agent.yaml` | `gpt-oss-120b-MXFP4-agent-only` on gb10-1, 4 streams, 110 s | `openai/gpt-oss-120b` |
 | D1, D2 | `role-split-diag-audio.yaml`: 1 concurrent stream, 60 s, the 73 clips twice | D1 `ggml-org/gemma-4-E4B-it-GGUF:Q8_0`, D2 `gemma-4-E4B-it-Q8_0-16-slots`, each loaded alone | `google/gemma-4-E4B-it` |
 
 F-L2 reruns footprint's L2 unchanged, so it reads `footprint-l2.yaml` itself rather than a copy.

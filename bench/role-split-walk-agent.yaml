@@ -1,0 +1,24 @@
+# Role-split slice 4, the architect's walkthrough: one S-agent level rerun as its own cell. The
+# split's agent section, gpt-oss-120b-MXFP4-agent-only on gb10-1, at 4 concurrent sessions for 110 s,
+# S-agent's level 4 (role-split-agent-split.yaml): 4 turns, the first 8,192 prompt tokens and the
+# next three 512 each, every turn exactly 512 output tokens, no think time. Read against the
+# finding's D.1 row at 4 streams. Engine-neutral: the section and its tokenizer
+# (openai/gpt-oss-120b) are given on the command line, as `cell`'s <section> <tokenizer>. Run from
+# the repository root:
+# `cell role-split-walk-s-agent-4 role-split-walk-agent gpt-oss-120b-MXFP4-agent-only openai/gpt-oss-120b`.
+spec:
+  backend:
+    kind: openai_http
+    request_format: /v1/chat/completions
+  profile:
+    kind: concurrent
+    streams: 4
+  data:
+    - kind: synthetic_text
+      turns: 4
+      first_prompt_tokens: 8192
+      prompt_tokens: 512
+      output_tokens: 512
+  constraints:
+    - kind: max_duration
+      seconds: 110
