@@ -216,7 +216,8 @@ Door          two-way: the pull request reverts by commit, and its
 ## Progress
 
 - Slice 1 done (no tracked change beyond 5842e6d): stack read; role-split pushed to both GB10s as hosts-next, clones on `hosts`, routers restarted; anchors A and B on both (B missed once at 2.71% on one errored request, repeat within noise: parity holds); full-set arm on gb10-2, every cell completed above the floor. Raw output in `.state/measure/gb10-{1,2}/2026-11-10.log` and `.state/role-split/`. gb10-2 serves capped set A, gb10-1 nothing loaded.
-- Escalation answered. Next: slice 2, the split.
+- Escalation answered.
+- Slice 2 done (no tracked change): the split loaded (gb10-1 agent-only 1.39 GiB above its floor idle, 0.27 GiB under load; gb10-2 77.40 GiB available), S-agent/S-vision/S-audio, S-mixed and S-knee all completed above the floor; hosts end as Behavior 12 states. Next: slice 3, the finding and docs.
 
 ## Decisions
 
@@ -312,6 +313,8 @@ Door          two-way: the pull request reverts by commit, and its
 - role-split (BUILD): F-L2 reuses `bench/footprint-l2.yaml` unchanged; the F-probe recipe lives in `bench/README.md`, its WAV cut locally to `.state/role-split/ami-es2002a-first10min.wav` (600.000 s, 16 kHz mono).
 - role-split (BUILD, escalation): granite stays unchanged in both arms; its idle-slot prompt-cache saves (177,658 log lines in F-embed, 43,743 in F-mixed; RSS 827 -> 965 MiB) are recorded as a finding and its cap as an intake note (the architect).
 - role-split (BUILD, escalation): F-L2's 31 of 32 meets Behavior 4 on memory (lowest 17.80 GiB); the one Gemma 4 output-parser error ("does not match the expected peg-gemma4 format") is recorded as a finding, not caused by the cap, and F-L2 isn't rerun (the architect).
+- role-split (BUILD): where GuideLLM found no knee (S-agent, S-audio), "holds" is the highest level meeting the floor; vision and audio floors are judged on each level's median (latency; per-request RTFx = audio seconds / request time), with p90, minimum and the count meeting the floor reported beside them.
+- role-split (BUILD): the split's mixed cells ran each host's processes from its own step script, both launched together.
 
 ## Pending edits
 
