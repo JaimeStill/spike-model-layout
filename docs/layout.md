@@ -53,8 +53,9 @@ LAN figures.
 The second capability host about doubles embedding's throughput and holds neither vision nor audio
 at the target or at 1 stream a host. On the Framework, vision alone at 1 stream met its floor
 (6.82 s) and audio alone did (RTFx 8.81); beside each other and embedding they missed (11.94 s,
-RTFx 4.03), with over 80 GiB free on both of the Framework's pools (framework finding, J and L.1). Two capability
-hosts hold at most 2 vision requests with nothing else running, against a load target of 4.
+RTFx 4.03), with over 80 GiB free on both of the Framework's pools (framework finding, J and
+L.1). Two capability hosts hold at most 2 vision requests with nothing else running, against a
+load target of 4.
 
 ## Sizing
 

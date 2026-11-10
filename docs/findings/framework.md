@@ -106,9 +106,10 @@ Framework), the cell stopped under a floor, capped at 10 min. Each cell's GuideL
 `.watch.tsv`, `.exit` and `.log` are under `.state/measure/<host>/`, named `framework-*`. Every
 measured cell's `.exit` reads 0: none was stopped (B's two helper tests that stop by design read
 143). The scenarios are role-split's, unchanged, listed in `bench/README.md`, "The framework
-task's cells". The steps ran from step files in the session's scratch directory, each run through `step.sh <host> <file>`, which sources the helpers for the host
-and exports its floors; copies of every step file are in `.state/framework/step-files/`, and the
-step log traces every command inside them (section M).
+task's cells". The steps ran from step files in the session's scratch directory, each run through
+`step.sh <host> <file>`, which sources the helpers for the host and exports its floors; copies of
+every step file are in `.state/framework/step-files/`, and the step log traces every command inside
+them (section M).
 
 **Per-level figures.** The step log holds each cell's summary line per level. Request latency (its
 median, p90 and minimum, and for vision the count at ≤10 s), the floors, RTFx and the knee come from
@@ -546,7 +547,7 @@ so the reading is not isolated. ITL, a server-side figure, rose 3.3 times for vi
 Its process GTT moved once, 18,380 → 19,028 MiB with the first image requests, as footprint's
 warmed growth did (19,062 then), and its RSS stayed under 1,500 MiB (K.2). The system pool fell
 from 87.13 GiB idle to 84.25 GiB at its lowest, 2.88 GiB (c), against footprint's fall of about 10
-GiB (23,639 → 13,660 MiB) through its uncapped L2.
+GiB (c: 23,639 − 13,660 = 9,979 MiB) through its uncapped L2.
 
 ### L.3 Granite's idle-slot saves, on both capability hosts
 
@@ -962,17 +963,51 @@ mkdir -p .state/framework && { date -Is; for h in gb10-1 gb10-2; do echo "== $h"
 Each step file ran through `step.sh` (`.state/framework/step-files/step.sh`), which sources the
 helpers for the host and exports its floors. The single-host steps, each with its output kept
 (21:26:08Z to 21:30:00Z; the store clear's output into `.state/framework/framework-store-clear.log`,
-the anchors' into `fw-anchors.out`):
+the anchors' into `fw-anchors.out`). Each command wrote its step file with a heredoc and then ran
+it; `…` stands for a heredoc's body, which is the step file's copy in
+`.state/framework/step-files/`, and a blank line separates the commands:
 
 ```sh
-D=<scratchpad>; bash $D/step.sh framework $D/fw-clone.sh 2>&1 | tail -30
-D=<scratchpad>; bash $D/step.sh framework $D/fw-store-dry.sh 2>&1 | tail -40
-D=<scratchpad>; bash $D/step.sh framework $D/fw-store-rm.sh 2>&1 | tail -40 | tee /home/jaime/experiments/spike-model-layout/.state/framework/framework-store-clear.log
-D=<scratchpad>; bash $D/step.sh framework $D/fw-store-probe.sh 2>&1 | tail -15
-D=<scratchpad>; bash $D/step.sh framework $D/helper-test.sh 2>&1 | tail -20
-D=<scratchpad>; bash $D/step.sh gb10-2 $D/helper-test-gb.sh 2>&1 | tail -12
-D=<scratchpad>; bash $D/step.sh framework $D/helper-test-stop.sh 2>&1 | grep -v "^  gpu\|readout"
-D=<scratchpad>; bash $D/step.sh framework $D/fw-anchors.sh > $D/fw-anchors.out 2>&1; grep -v "^  gpu" $D/fw-anchors.out | tail -50
+D=<scratchpad>; mkdir -p $D; cat > $D/step.sh <<'EOF'
+…
+EOF
+cat > $D/fw-clone.sh <<'EOF'
+…
+EOF
+bash $D/step.sh framework $D/fw-clone.sh 2>&1 | tail -30
+
+D=<scratchpad>; cat > $D/fw-store-dry.sh <<'EOF'
+…
+EOF
+bash $D/step.sh framework $D/fw-store-dry.sh 2>&1 | tail -40
+
+D=<scratchpad>; cat > $D/fw-store-rm.sh <<'EOF'
+…
+EOF
+bash $D/step.sh framework $D/fw-store-rm.sh 2>&1 | tail -40 | tee /home/jaime/experiments/spike-model-layout/.state/framework/framework-store-clear.log
+
+D=<scratchpad>; cat > $D/fw-store-probe.sh <<'EOF'
+…
+EOF
+bash $D/step.sh framework $D/fw-store-probe.sh 2>&1 | tail -15
+
+mise run check >/dev/null 2>&1; echo "check exit $?"; D=<scratchpad>; cat > $D/helper-test.sh <<'EOF'
+…
+EOF
+bash $D/step.sh framework $D/helper-test.sh 2>&1 | tail -20; cat > $D/helper-test-gb.sh <<'EOF'
+…
+EOF
+bash $D/step.sh gb10-2 $D/helper-test-gb.sh 2>&1 | tail -12
+
+D=<scratchpad>; cat > $D/helper-test-stop.sh <<'EOF'
+…
+EOF
+bash $D/step.sh framework $D/helper-test-stop.sh 2>&1 | grep -v "^  gpu\|readout"
+
+D=<scratchpad>; cat > $D/fw-anchors.sh <<'EOF'
+…
+EOF
+bash $D/step.sh framework $D/fw-anchors.sh > $D/fw-anchors.out 2>&1; grep -v "^  gpu" $D/fw-anchors.out | tail -50
 ```
 
 The baseline reload on both GB10s at once (21:34:12Z), and the baseline cells, B-target (21:35:41Z)
@@ -1007,21 +1042,28 @@ D=<scratchpad>; MIX=p-target AGENT=4 VISION=2 AUDIO=2 EMBED=8 bash $D/mixed-p.sh
 D=<scratchpad>; MIX=p-held AGENT=4 VISION=1 AUDIO=1 EMBED=8 bash $D/mixed-p.sh; echo rc $?; cat $D/p-held.done
 ```
 
-The end-state reads (22:10:34Z), after the step file was written:
+The end-state reads (22:10:34Z), the step file written by a heredoc as above:
 
 ```sh
+D=<scratchpad>
+cat > $D/end-state.sh <<'EOF'
+…
+EOF
 for h in gb10-1 gb10-2 framework; do echo "#### $h"; bash $D/step.sh $h $D/end-state.sh 2>&1 | tee $D/end-state-$h.out; done
 ```
 
-**The per-level tables** in C, D, F, G, I, J and L, and the errors in D and L.4, were read from
-the cells' JSON with [`bench/levels.jq`](../../bench/levels.jq) at 22:16:53Z, into
-`.state/framework/jq-figures-slice3.txt`. The session's tables after each slice (21:45:04Z and
-22:11:04Z, `jq-figures-slice1.txt` and `-slice2.txt`) read the same figures with the program as it
-stood; vision's minimum and the count at ≤10 s, which an inline `jq` gave then, come from the
-extended program here:
+**The per-level tables** in C, D, F, G, I, J and L were read from the cells' JSON with
+[`bench/levels.jq`](../../bench/levels.jq) at 22:16:53Z, into
+`.state/framework/jq-figures-slice3.txt`, and the errors in D and L.4 with the inline `jq` that
+follows it in the same command, which prints each errored request's message as GuideLLM recorded
+it. The command first kept the previous read and ended by comparing the two, which differed in the
+order of the tables only, every line the same.
+The session's tables after each slice (21:45:04Z and 22:11:04Z, `jq-figures-slice1.txt` and
+`-slice2.txt`) read the same figures with the program as it stood; vision's minimum and the count
+at ≤10 s, which an inline `jq` gave then, come from the extended program here:
 
 ```sh
-M=.state/measure; { date -u +%FT%TZ; for f in $M/framework/framework-f[ab].json; do echo "# ${f#$M/}"; jq -r --arg purpose agent -f bench/levels.jq $f; done; for p in agent vision audio embed; do for f in $M/*/framework-*-$p.json; do echo "# ${f#$M/}"; jq -r --arg purpose $p -f bench/levels.jq $f; done; done; for f in $M/*/framework-f[ab].json $M/*/framework-[bpx]-*.json; do jq -r --arg f "${f#$M/}" '.benchmarks[] | (.config.strategy.streams|tostring) as $s | .requests.errored[]? | "\($f) s=\($s): \(.info.error // .error // "?" | tostring | .[0:220])"' $f; done; } > .state/framework/jq-figures-slice3.txt 2>&1
+cp .state/framework/jq-figures-slice3.txt <scratchpad>/jq3-prev.txt; M=.state/measure; { date -u +%FT%TZ; for f in $M/framework/framework-f[ab].json; do echo "# ${f#$M/}"; jq -r --arg purpose agent -f bench/levels.jq $f; done; for p in agent vision audio embed; do for f in $M/*/framework-*-$p.json; do echo "# ${f#$M/}"; jq -r --arg purpose $p -f bench/levels.jq $f; done; done; for f in $M/*/framework-f[ab].json $M/*/framework-[bpx]-*.json; do jq -r --arg f "${f#$M/}" '.benchmarks[] | (.config.strategy.streams|tostring) as $s | .requests.errored[]? | "\($f) s=\($s): \(.info.error // .error // "?" | tostring | .[0:220])"' $f; done; } > .state/framework/jq-figures-slice3.txt 2>&1; echo rc $?; diff <(sed 1d .state/framework/jq-figures-slice3.txt) <(sed 1d <scratchpad>/jq3-prev.txt) && echo same
 ```
 
 ## N. Open items for later tasks
