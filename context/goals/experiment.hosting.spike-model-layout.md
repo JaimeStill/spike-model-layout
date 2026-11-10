@@ -222,7 +222,7 @@ Door          two-way: the clone move and router restart revert by
 
 ## Progress
 
-slices 2/4 committed · standards — · spec — · editor —
+slices 3/4 committed · standards — · spec — · editor —
 
 ## Decisions
 
