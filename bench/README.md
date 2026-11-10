@@ -92,17 +92,17 @@ jq -r --arg purpose agent -f bench/levels.jq .state/measure/gb10-2/role-split-f-
 `purpose` is `agent`, `vision`, `audio` or `embed`, and sets the floor each level is judged by:
 ITL median ≤100 ms, request latency median ≤10 s, RTFx median ≥5 (each request's clip seconds over
 its request time), or mean prompt tok/s ≥4,300; a level with no successful request misses. Each
-table starts with the knee GuideLLM concluded, when the profile reports one. `--arg purpose client`
-prints instead GuideLLM's own per-request timings for one level (`--argjson level <i>`, default
-the first): the gap between requests, request start to first streamed chunk, streaming, and audio
-bytes. Medians and percentiles interpolate linearly between the two nearest ranks.
+table starts with the knee GuideLLM concluded, when the profile reports one. With
+`--arg purpose client`, it prints GuideLLM's own per-request timings for one level instead
+(`--argjson level <i>`, default the first): the gap between requests, the time from request start
+to the first streamed chunk, the streaming time, and the audio bytes. Medians and percentiles interpolate linearly between the two nearest ranks.
 
 ## Reading the router log: `srvtimes.awk`
 
 [`srvtimes.awk`](srvtimes.awk) reads llama-server's router log (`docker logs --timestamps llama`,
 saved to a file) for one child port and prints each timed request's server figures: the audio
-encode, prompt eval, eval, total, the router's proxy line to the slot's start, and the previous
-release to the next proxy line. [`stats.awk`](stats.awk) gives each figure's count, median
+encode, prompt eval, eval and total, the time from the router's proxy line to the slot's start, and
+the time from the previous request's release to the next proxy line. [`stats.awk`](stats.awk) gives each figure's count, median
 (interpolated as `levels.jq` does), min and max:
 
 ```sh

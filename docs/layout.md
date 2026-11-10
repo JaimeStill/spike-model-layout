@@ -11,15 +11,15 @@ left loaded, not a layout decision.
 | Host | Stack | Engine and preset | Serves now | Parity | Finding |
 | --- | --- | --- | --- | --- | --- |
 | gb10-1 | DGX OS 7.6.0, kernel 7.0.0-1025-nvidia, driver 580.178.04, CUDA 13.0, Docker 29.6.2 | llama.cpp `server-cuda13-b12098`, spike-model-engines' shared preset at 2d7ae32 (its `role-split` branch, on the host's local `hosts` branch until it merges) | `gpt-oss-120b-MXFP4-agent-only` (c 1,179,648 over 16 slots, unified) | the reference GB10 | [hosts](findings/hosts.md): stack, sections A, B, D, E; [role-split](findings/role-split.md): stack, A, G |
-| gb10-2 | as gb10-1 | as gb10-1 | `gemma-4-26B-A4B-it-qat-Q4_0-16-slots`, `gemma-4-E4B-it-Q8_0-16-slots` (16 slots of 8,192 each, prompt cache capped), granite-embedding | within run noise of gb10-1 on anchors A and B (means: A −1.37%, B −0.99% output tok/s); rechecked 2026-11-10: A −0.85%, B −1.17% on its repeat; cells compare across the two GB10s | [hosts](findings/hosts.md): stack, sections A, B, D, E; [role-split](findings/role-split.md): stack, A, B, G |
+| gb10-2 | as gb10-1 | as gb10-1 | `gemma-4-26B-A4B-it-qat-Q4_0-16-slots`, `gemma-4-E4B-it-Q8_0-16-slots` (16 slots of 8,192 each, prompt cache capped), granite-embedding | within run noise of gb10-1 on anchors A and B (means: A −1.37%, B −0.99% output tok/s); rechecked in role-split: A −0.85%, B −1.17% on B's repeat; cells compare across the two GB10s | [hosts](findings/hosts.md): stack, sections A, B, D, E; [role-split](findings/role-split.md): stack, A, B, G |
 | framework | Omarchy, kernel 7.2.15-1-omarchy, Mesa 26.2.5, Docker 29.9.2 | llama.cpp `server-vulkan-b12098` (moved from b11960, no regression), the shared preset at 3b60fa4 (main) | set A, its Gemma prompt cache at the default | not compared with the GB10s | [hosts](findings/hosts.md): stack, sections A, B, C |
 
 ### Roles measured on the GB10s
 
-Both arrangements role-split compared, measured on 2026-11-10 ([role-split](findings/role-split.md),
-sections I, J and K.3). "Holds" is the most sessions or requests meeting the purpose's floor (agent
-ITL ≤100 ms, vision ≤10 s an image question, audio RTFx ≥5, embedding ≥4,300 prompt tok/s) at or
-below its knee, one purpose loaded at a time.
+The table gives the two arrangements the [role-split finding](findings/role-split.md) compared
+(sections I, J and K.3). "Holds" is the most sessions or requests meeting the purpose's floor
+(agent ITL ≤100 ms, vision ≤10 s an image question, audio RTFx ≥5, embedding ≥4,300 prompt tok/s)
+at or below its knee, with one purpose loaded at a time.
 
 | Arrangement | Host | Role | Holds, each purpose alone | At the load targets, all at once | Pool idle / lowest under load (floor 12.2 GiB) |
 | --- | --- | --- | --- | --- | --- |
@@ -28,6 +28,12 @@ below its knee, one purpose loaded at a time.
 | Split | gb10-2 | vision, audio, embedding | vision 1, audio 1; embedding meets at 16 in every mixed cell | embedding meets; vision (38.90 s) and audio (RTFx 0.98) miss | 77.40 / 68.69 GiB |
 
 Agent sessions are the 4-turn shape, at most 11,776 tokens; 131,072-token sessions stay computed.
+
+Production clients sit on the same direct network as the GPUs, so the layout is sized on LAN
+figures. The full set ran with its client on the LAN. The split ran from the laptop over a
+Tailscale relay: its client-side figures (vision latency, audio RTFx, TTFT) are pessimistic, and its
+server-side figures (ITL, memory) are unaffected ([role-split](findings/role-split.md), "Stack,
+engine and network path" and L.7).
 
 ## Sizing
 

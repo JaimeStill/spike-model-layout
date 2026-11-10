@@ -90,6 +90,9 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
   tier and conform helpers, sourced and called one step at a time, logging every command to this
   spike's `.state/measure/<host>/`. The read-only `footprint` helper prints each llama-server
   process's memory, the pool, and the router's buffer lines.
+- **The result readers:** `bench/levels.jq` turns GuideLLM's result JSON into per-level tables
+  judged against each purpose's floor, and `bench/srvtimes.awk` with `bench/stats.awk` reads each
+  request's server timings from the router log, [`bench/README.md`](../bench/README.md).
 
 ## Path
 
@@ -102,10 +105,9 @@ and load targets are agreed in its task's own plan round.
 2. `footprint`: memory per model on a GB10 and on the Framework, and the capacity table
    (evidence 2).
 3. `role-split`: set A on one GB10, then the roles split across both GB10s, compared in one
-   session (evidence 3, 4). It starts from the footprint finding's open items (section K): set A's
-   two Gemma sections leave llama.cpp's host prompt cache (`cache-ram`) at its 8192 MiB default,
-   which took gb10-1 under its floor under vision load, and capping it is a pull request to
-   spike-model-engines' `host/` citing that finding.
+   session (evidence 3, 4). A pull request to spike-model-engines' `host/` first caps llama.cpp's
+   host prompt cache (`cache-ram`) on set A's two Gemma sections, whose 8192 MiB default took
+   gb10-1 under its floor under vision load (the footprint finding, section K).
 4. `framework`: the Framework in the role the role-split findings point to (evidence 3, 5).
 5. `agent-vllm`: gpt-oss-120b on vLLM v0.33.0 in a container against llama.cpp on the agent GB10,
    in one session (evidence 6).

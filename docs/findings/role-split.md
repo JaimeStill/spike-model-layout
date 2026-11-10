@@ -3,17 +3,28 @@
 Measured 2026-11-10, task `role-split`. This finding is dated: every figure holds for the versions,
 stack, preset and network path below, on that day, and nothing after it.
 
-**What it establishes.** How many sessions or requests each placed model holds at its context
-before its knee or its speed floor, in two arrangements: the full set (set A, its Gemma prompt
-cache capped, on one GB10) and the split (one GB10 serving the agent alone, the other vision,
-audio and embedding). It answers evidence 3 (section I) and evidence 4 (section J), adds the
-capacity rows it measured beside the [footprint finding](footprint.md)'s table (section K), and
-closes three of footprint's six open items, two of them in part (section K.4). On the way it found that the capped Gemma
-sections still grow their RSS under load, that vision answers about 0.23 requests a second however
-many streams send them, in both arrangements, because the server encodes one image at a time
-(L.1), that the split's slower single-stream audio is not the 16-slot section's but each
-request's trip from the laptop over a Tailscale relay, about 0.4 s a request (L.7), and that the
-agent-only GB10 sits 1.39 GiB above its floor idle. It decides nothing.
+**What it establishes.** The finding measures how many sessions or requests each placed model
+holds at its context before its knee or its speed floor, in two arrangements: the full set (set A,
+its Gemma prompt cache capped, on one GB10) and the split (one GB10 serving the agent alone, the
+other vision, audio and embedding). It answers evidence 3 (section I) and evidence 4 (section J),
+adds the capacity rows it measured beside the [footprint finding](footprint.md)'s table (section
+K), and closes three of footprint's six open items, two of them in part (section K.4). It also
+found that:
+
+- the capped Gemma sections still grow their RSS under load (L.2);
+- vision answers about 0.23 requests a second however many streams send them, in both
+  arrangements, because the server encodes one image at a time (L.1);
+- the agent-only GB10 sits 1.39 GiB above its floor idle (G);
+- the split's slower single-stream audio comes from each request's trip from the laptop over a
+  Tailscale relay, about 0.4 s a request, not from the 16-slot section (L.7).
+
+It decides nothing.
+
+**Which figures size the layout.** Production clients sit on the same direct network as the GPUs,
+so the layout is sized on LAN figures (the architect). The full-set arm ran with the laptop on the
+LAN. The split arm ran over a Tailscale relay, so its client-side figures (TTFT, request latency,
+requests a second, RTFx, embedding's prompt tok/s) are pessimistic; its server-side figures (encode, prompt eval, ITL,
+memory, buffers) are unaffected ("Stack, engine and network path").
 
 | Host | Serves at the end of the session |
 | --- | --- |
@@ -44,10 +55,12 @@ for slice 1 (the anchors and the full-set arm). The laptop then moved off the LA
 gb10-2 via DERP(iad) in 61 ms (112 ms at a read a minute earlier), "direct connection not
 established" (`.state/role-split/ping-1023.txt`). No ping was recorded between 11:33Z and 15:23Z, so
 the split arm (section G on) and D1 and D2 ran from the laptop over Tailscale relays, not the LAN.
-The architect judged network latency not the bottleneck and the split's cells weren't rerun on the
-LAN (goal record, Decisions). Figures read on the server (encode, prompt eval, ITL, memory, buffers)
-don't carry the path; figures read on the client (TTFT, request latency, requests a second, RTFx)
-do, most for the shortest requests.
+Figures read on the server (encode, prompt eval, ITL, memory, buffers) don't carry the path;
+figures read on the client (TTFT, request latency, requests a second, RTFx, embedding's prompt tok/s) do, most for the
+shortest requests. The split's cells weren't rerun on the LAN: the architect judged network latency
+not the bottleneck, and production clients sit on the same direct network as the GPUs, so the
+layout is sized on LAN figures and reads the split's client-side figures as pessimistic (goal
+record, Decisions).
 
 **Engine and preset.** llama.cpp b12098 on both GB10s, each router serving spike-model-engines'
 shared preset (`host/llama-preset/models.ini`) from the `role-split` branch at 2d7ae32 (section A).
@@ -503,12 +516,16 @@ tokens stay computed (footprint I.4, I.7). The E4B's slot does not take a 10-min
 | **Memory left, lowest under load** | gb10-2 15.86 GiB (F-mixed; 3.66 above, c) | gb10-1 12.47 GiB (S-knee; 0.27 above, c); gb10-2 68.69 GiB (S-mixed; 56.49 above, c) |
 | **Errors** | 1 parser error in F-L2, 3 in F-vision; 1 JSON decode in F-agent | 3 parser errors in S-vision; 2 JSON decode in S-agent |
 
-So, at the load targets, the split held the agent where the full set did not (ITL 50.76 against
+At the load targets, the split held the agent where the full set did not (ITL 50.76 against
 237.67 ms) and gave embedding 1.55 times the throughput (c: 13,838 / 8,933); neither held vision or
 audio at 4 streams. At its knees the split held the agent and embedding with all four running, and
 missed vision and audio at 1 stream each. Memory moved the other way on the agent's host: the
 full set leaves 3.66 GiB above gb10-2's floor at its lowest; the split leaves 0.27 GiB above
 gb10-1's, and 56.49 GiB above gb10-2's.
+
+The split's client-side figures here (TTFT, vision latency, audio RTFx) ran over a Tailscale relay
+and are pessimistic for production clients on the GPUs' network; its ITL and memory figures are
+unaffected ("Stack, engine and network path").
 
 ## K. Capacity rows, measured (Behavior 11)
 
@@ -1230,8 +1247,8 @@ None of these is decided here.
   in the full set and 1 in the split against a load target of 4.
 - **Several llama.cpp vision processes are not pursued**, by the architect's decision: more
   processes add load on the shared GPU's compute and bandwidth. The open question is the best
-  inference path for vision, audio and embedding, likely each in its own vLLM process, which
-  agent-vllm takes up.
+  inference path for vision, audio and embedding, likely each in its own vLLM process, which the
+  agent-vllm task is planned to take up.
 - **The capped Gemma sections' RSS growth** with no save counted (L.2): 26B-A4B +6138 MiB at 16
   slots by the end of the split arm, not attributed.
 - **Granite's idle-slot saves** (L.3): capping granite is an intake note, by the architect's
@@ -1242,14 +1259,16 @@ None of these is decided here.
 - **The agent held 4 sessions on the agent-only GB10, not 9** (I): the 9 is footprint's memory count
   for 131,072-token sessions; the measured 4 is the ITL floor's count for the 4-turn shape, missed at
   8. Sessions of 131,072 tokens stay computed.
-- **Single-stream audio slower after F-audio** (RTFx 6.12 in S-audio against 11.11 in F-audio):
-  not the 16-slot section's but the network path. D1 and D2, each E4B section fresh and alone,
-  matched each other (RTFx 6.43 and 6.53, TTFT 495 and 516 ms) and S-audio, with the server's own
-  timings alike in all four runs; the extra 0.4 to 0.6 s a request fell before the router's proxy
-  line. Timed by curl, the same 6 s clip took 0.377 to 0.423 s from gb10-1 (direct, 2 ms) and 0.772
-  to 0.922 s from the laptop (DERP(iad), 61 ms): the ~0.4 s is the request's trip over the relay
-  (L.7). It lands on each request's latency, not on the host's throughput. The split's
-  single-stream audio figures (S-audio, and D1 and D2) carry it; F-audio's, from the LAN, don't.
+- **Single-stream audio ran slower in the split than in F-audio** (RTFx 6.12 against 11.11)
+  because of the network path, not the 16-slot section. D1 and D2, each E4B section fresh and
+  alone, matched each other (RTFx 6.43 and 6.53, TTFT 495 and 516 ms) and S-audio, with the
+  server's own timings alike in all four runs; the extra 0.4 to 0.6 s a request fell before the
+  router's proxy line. Timed by curl, the same 6 s clip took 0.377 to 0.423 s from gb10-1 (direct,
+  2 ms) and 0.772 to 0.922 s from the laptop (DERP(iad), 61 ms): the ~0.4 s is the request's trip
+  over the relay (L.7). It lands on each request's latency, not on the host's throughput. The
+  split's single-stream audio figures (S-audio, D1 and D2) carry it; F-audio's, from the LAN,
+  don't. Production clients sit on the same direct network as the GPUs, so the layout is sized on
+  LAN figures and records the relay's cost only as a fact of off-network use (the architect).
 - **The capability host's purposes slower beside each other** in S-knee (L.6): not isolated.
 - **Neither arrangement held vision or audio at the load target of 4** (F, J).
 - **The 10-minute WAV** is 15,023 tokens, refused by an 8,192-token slot (E); the E4B keeps its
@@ -1261,6 +1280,6 @@ None of these is decided here.
     cause of the capability host's mixed-cell misses: memory capacity was never the limit there,
     gb10-2's lowest in any split cell being 68.69 GiB (H);
   - that the relay's cost grows with the payload and the round trip, so a larger audio window or
-    an image pays more than the 6 s clip's ~0.4 s (L.7).
+    an image pays more than the 6 s clip's ~0.4 s off the network (L.7).
 - From footprint's section K, still open (K.4): the Framework's system memory floor and its side of
   the prompt cache, the Gemma models' trained contexts, and the 26B-A4B on Vulkan past 4 slots.
