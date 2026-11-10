@@ -1,15 +1,15 @@
 # goal · experiment.hosting.spike-model-layout
 
-- **State:** building
-- **Task:** framework
-- **Branch:** framework
+- **State:** idle
+- **Task:** none
+- **Branch:** none
 
 ## Tasks
 
 1. [x] hosts
 2. [x] footprint
 3. [x] role-split
-4. [ ] framework
+4. [x] framework
 5. [ ] agent-vllm
 6. [ ] on-demand
 7. [ ] two-node
@@ -219,10 +219,6 @@ Door          two-way: the clone move and router restart revert by
               uses the existing sudoers rule on the GB10s.
 ```
 
-
-## Progress
-
-slices 3/4 committed, slice 4 waived · standards ✓ · spec ✓ · editor ✓
 
 ## Decisions
 
