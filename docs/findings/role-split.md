@@ -11,13 +11,13 @@ capacity rows it measured beside the [footprint finding](footprint.md)'s table (
 closes three of footprint's six open items, two of them in part (section K.4). On the way it found that the capped Gemma
 sections still grow their RSS under load, that vision answers about 0.23 requests a second however
 many streams send them, in both arrangements, because the server encodes one image at a time
-(L.1), and that the agent-only GB10 sits 1.39 GiB above its
-floor idle. It decides nothing.
+(L.1), that the split's slower single-stream audio is not the 16-slot section's (L.7), and that
+the agent-only GB10 sits 1.39 GiB above its floor idle. It decides nothing.
 
 | Host | Serves at the end of the session |
 | --- | --- |
 | gb10-1 | `gpt-oss-120b-MXFP4-agent-only` (c 1,179,648, 16 slots, unified), 12.47 GiB available |
-| gb10-2 | `gemma-4-26B-A4B-it-qat-Q4_0-16-slots`, `gemma-4-E4B-it-Q8_0-16-slots` and granite, 68.94 GiB available |
+| gb10-2 | `gemma-4-26B-A4B-it-qat-Q4_0-16-slots`, `gemma-4-E4B-it-Q8_0-16-slots` and granite, reloaded fresh after the D1/D2 pair (L.7): 77.33 GiB available idle, read 15:19:53Z |
 | framework | set A from main, untouched: no read, load, request or clone change this task |
 
 Both GB10s' spike-model-engines clones are on the local `hosts` branch at 2d7ae32 (section A).
@@ -284,7 +284,7 @@ S-audio, gb10-2, the 16-slot E4B (c 131072, 16 slots of 8192), levels [1, 4, 8, 
 
 **Holds 1 request.** At 1 stream the split's E4B ran slower than the full set's: RTFx median 6.12
 against 11.11, TTFT 675 against 161 ms, 22 requests in 30 s against 49, with ITL alike (22.17
-against 21.65 ms). Section L.6.
+against 21.65 ms). Section L.6; the pair in L.7 finds slot count doesn't explain it.
 
 ### D.4 Embedding
 
@@ -658,8 +658,8 @@ S-agent 2 (12 streams). Anchor B's one is what put its first run outside parity 
 ### L.6 Speed the arms don't explain
 
 - **Audio, single stream.** The split's 16-slot E4B ran at RTFx 6.12 alone against the full set's
-  4-slot E4B at 11.11, its TTFT 675 against 161 ms, with ITL alike (D.3). The sections differ in
-  slots and c; the hosts' other residents differ too. Not isolated.
+  4-slot E4B at 11.11, its TTFT 675 against 161 ms, with ITL alike (D.3). The pair in L.7 tests
+  slot count alone: it doesn't explain it.
 - **Agent at 8 sessions.** S-agent's 8 sessions missed at ITL 109.63 ms and TTFT 25,279 ms, where
   F-agent's 8 met at 68.66 ms and 18,137 ms. set-a has 4 slots, so F-agent's 8 streams exceed its
   slots; the agent-only section serves 16. At 4 sessions the two were within 3.5 ms of ITL apart
@@ -667,6 +667,94 @@ S-agent 2 (12 streams). Anchor B's one is what put its first run outside parity 
 - **The capability host under its own mix.** In S-knee, 1 vision stream took 10.14 s against
   4.32 s alone, and 1 audio stream ran at RTFx 2.26 against 6.12 alone, with granite at 16 streams
   beside them (F). No cell ran them in pairs.
+
+### L.7 Single-stream audio, D1 and D2: slot count doesn't explain the split's slowdown
+
+**Decision it informs:** whether the split's single-stream audio slowdown (S-audio level 1 against
+F-audio level 1, D.3) comes from the 16-slot section. By the architect's escalation answer, a
+back-to-back pair on gb10-2, each section loaded fresh and alone: **D1** set A's 4-slot E4B
+(`ggml-org/gemma-4-E4B-it-GGUF:Q8_0`), **D2** the 16-slot E4B (`gemma-4-E4B-it-Q8_0-16-slots`).
+Each step: `unload --all`, cache dropped, the one section loaded, 30 s idle, cache dropped and
+read, then one cell, `bench/role-split-diag-audio.yaml`: one concurrent stream for 60 s, no ramp-up,
+F-audio's and S-audio's request (the card's transcription prompt, one LibriSpeech clip, at most
+256 out), the 73 clips read twice in the knee files' order. Then gb10-2 went back to Behavior 12's
+state. 15:14:15-15:19:56Z; gb10-1 and the Framework untouched.
+
+**The two loads.** The arguments differ only in `--ctx-size` and `--parallel` (the full arguments
+from the router's `/models`, besides the port and alias, are otherwise identical; the load
+helper's filter printed):
+
+| | D1, 4-slot E4B | D2, 16-slot E4B |
+| --- | --- | --- |
+| `load` (m) | 9.9 s; `--no-cache-idle-slots --ctx-size 32768 --cache-ram 0 --swa-checkpoints 2 --parallel 4` | 9.9 s; `--no-cache-idle-slots --ctx-size 131072 --cache-ram 0 --swa-checkpoints 2 --parallel 16` |
+| Slots | `n_slots = 4, n_ctx_slot = 8192, kv_unified = 'false'` | `n_slots = 16, n_ctx_slot = 8192, kv_unified = 'false'` |
+| Weights GPU / host | 4788.12 / 3536.00 | the same |
+| Full-attention KV | 512.00 (8192 cells, 4 layers, 4/4 seqs) | 2048.00 (8192 cells, 4 layers, 16/16 seqs) |
+| Sliding-window KV | 160.00 (1024 cells, 20 layers, 4/4 seqs) | 640.00 (1024 cells, 20 layers, 16/16 seqs) |
+| Compute GPU / host | 137.02 / 50.03 | the same |
+| Projectors (gemma4v, gemma4a) | 533.83 each; compute GPU 101.27 + 101.19, CPU 6.77 + 1.58; worst case 746.89 | the same |
+| Output (host) | 4.00 | 16.00 |
+| Idle, 30 s, after a drop (m) | 107.08 GiB; process 6530 MiB GPU / 4141 RSS | 105.04 GiB; 8546 / 4156 |
+| After the cell, after a drop (m) | 106.30 GiB; 6760 / 4723 | 104.20 GiB; 8776 / 4808 |
+
+Neither the ubatch nor the batch size is passed by either section, and the compute buffers, sized
+by them, are equal. Both processes' figures match the F and S arms' (G, K.2).
+
+**The client's figures** (each run's JSON, `levels.py`; the first 30 s counts the requests that
+ended by 30 s into the level):
+
+| Run | Section, residents | Ok / errored / incomplete | Output tok/s | TTFT median | ITL median | Latency median / p90 | RTFx median / min | RTFx ≥5 | First 30 s: ok, RTFx median / min |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| F-audio, 1 stream (12:13:18Z) | 4-slot, beside set A | 49 / 0 / 1 in 30 s | 31.97 | 161 ms | 21.65 ms | 0.50 / 0.96 s | 11.11 / 6.28 | 49 of 49 | 49, 11.11 / 6.28 |
+| S-audio, 1 stream (14:30:56Z) | 16-slot, beside the 16-slot 26B-A4B and granite | 22 / 0 / 0 in 30 s | 18.27 | 675 ms | 22.17 ms | 1.14 / 1.82 s | 6.12 / 3.24 | 19 of 22 | 21, 6.23 / 3.24 |
+| **D1** (15:15:20Z) | 4-slot, alone | 59 / 0 / 1 in 60 s | 18.48 | 495 ms | 22.18 ms | 0.85 / 1.37 s | 6.43 / 3.62 | 48 of 59 | 25, 6.70 / 3.62 |
+| **D2** (15:17:34Z) | 16-slot, alone | 58 / 0 / 0 in 60 s | 18.23 | 516 ms | 21.87 ms | 0.86 / 1.45 s | 6.53 / 3.33 | 45 of 58 | 25, 6.55 / 3.33 |
+
+**D1 and D2 match**, within 21 ms of TTFT and 0.1 of RTFx, and both sit with S-audio, not with
+F-audio: set A's own 4-slot section, alone and freshly loaded, ran as slowly as the split's. Both
+meet the floor on the median (RTFx ≥5) and miss it on about a fifth of their requests.
+
+**The server's figures.** Each request's timings from gb10-2's router log, read-only, over each run's
+1-stream window (the child's `print_timing` lines, its `audio decoded` lines, and the router's
+`proxying request` line before each task). Medians, from
+`.state/role-split/audio-diag-gb10-2-2026-11-10.txt`:
+
+| Run | Requests timed | n_ctx_slot | Audio encode | Prompt eval (tokens) | Eval (ms a token) | Total | Router proxy → slot start | Release → next proxy |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| F-audio | 47 | 8192 | 13 ms | 142.5 ms (168) | 363.8 ms (21.4) | 504.6 ms | 10.1 ms | **14.0 ms** |
+| S-audio | 20 | 8192 | 14 ms | 158.7 ms (234.5) | 442.3 ms (22.0) | 605.1 ms | 17.4 ms | **597.5 ms** |
+| D1 | 59 | 8192 | 13 ms | 144.5 ms (168) | 354.8 ms (21.6) | 499.2 ms | 11.5 ms | **404.2 ms** |
+| D2 | 58 | 8192 | 13.5 ms | 145.3 ms (164.5) | 342.1 ms (21.6) | 486.0 ms | 10.5 ms | **419.9 ms** |
+
+Inside the server the four runs are alike: one audio encode of 10 to 116 ms a request, prompt eval
+and eval within their clips' token counts (S-audio's 20 requests are the clips' first 20, longer on
+the median), the same ms a token, one slot used at a time with 4 or 16 configured. **What differs is
+between requests:** in F-audio the next request reached the router 14 ms after the last one's
+release; in S-audio, D1 and D2, 404 to 598 ms. GuideLLM's own timings place part of it on the
+laptop: from one request's end to the next's start, 6 ms in F-audio, 61 to 68 ms in the other three;
+from a request's start to its first streamed chunk, 161 ms in F-audio, 495 to 696 ms in the others.
+Subtracting the server's proxy-to-slot and prompt-eval medians from that, about 8 ms of F-audio's
+time to first chunk falls outside the server, 339 ms of D1's, 359 ms of D2's and 520 ms of
+S-audio's (c, from medians: 161 − 10.1 − 142.5; 495 − 11.5 − 144.5; 515 − 10.5 − 145.3; 696 − 17.4
+− 158.7). That time is spent before the router logs its proxy line: on the laptop, on the network,
+or in the router receiving the request (a median of 168 to 207 KB of WAV in its JSON). These reads
+don't separate the three.
+
+**What else differed between F-audio and S-audio.** Slot count doesn't explain the slowdown, and
+D1 rules out the residents and the page cache as needed for it: it was slow with no other section
+loaded and the cache dropped. What did differ, none of it measured apart: F-audio ran at
+12:13Z, the session's earlier part, after F-agent and F-vision; S-audio at 14:30Z, after S-vision,
+with the 16-slot 26B-A4B co-resident and recently busy and granite loaded; D1 and D2 at 15:15Z
+after a drop. The laptop running GuideLLM, the network path from it (direct on the LAN when read
+at the session's start, Stack; not read again), and the router process (pid 1622373 in every `footprint`
+read of the session, its container started 11:34:10Z, its log grown by every cell) are the parts the slow runs share and these reads don't measure.
+Nothing here decides the cause.
+
+**gb10-2 restored.** `unload --all`, cache dropped (117.51 GiB available), the 16-slot 26B-A4B
+(13.1 s), the 16-slot E4B (9.9 s) and granite (3.5 s) loaded, 15:18:55-15:19:22Z, idle 30 s, cache
+dropped and read at 15:19:53Z: **77.33 GiB available (m)**, against G's 77.40. Processes (GPU / RSS,
+MiB): 26B-A4B 25335 / 1231, E4B 8546 / 4157, granite 863 / 827, G's figures; router 170 / 622.
+Their buffers, as `footprint` printed them, are G's.
 
 ## M. Every run
 
@@ -691,6 +779,9 @@ S-agent 2 (12 streams). Anchor B's one is what put its first run outside parity 
 | S-audio | gb10-2 | `bench/role-split-audio-split.yaml`, 16-slot E4B, knee [1,4,8,12,16] | as F-audio | ≤30 s a level, 157 s | audio requests in the split (D.3) |
 | S-mixed | gb10-1 and gb10-2 at once | `bench/role-split-mixed-*.yaml`, the split's sections | agent 4, vision 4, audio 4, embedding 16 | 240 s each, about 4.5 min | the split at the full set's targets (F) |
 | S-knee | gb10-1 and gb10-2 at once | as S-mixed | agent 4, vision 1, audio 1, embedding 16 | 240 s each, about 4.5 min | what the split holds at its knees (F) |
+| D1 | gb10-2 | `bench/role-split-diag-audio.yaml`, set A's 4-slot E4B loaded fresh and alone after `unload --all` and a cache drop, 30 s idle | 1 stream, LibriSpeech clips as F-audio | 60 s | whether slot count explains the split's single-stream audio (L.7) |
+| D2 | gb10-2 | as D1, the 16-slot E4B | as D1 | 60 s | as D1 (L.7) |
+| Restore | gb10-2 | the split's three sections after `unload --all` and a cache drop; 30 s idle | none | 27 s (load to last) | gb10-2 back to Behavior 12's state (L.7) |
 
 Every cell ran under `watch`, memory sampled every 10 s, capped at 10 min, the floor
 `MEASURE_FLOOR_GIB` 12.2 on both GB10s.
@@ -899,7 +990,68 @@ the order the shell reached them.
 09:40:24  cell role-split-s-knee-vision role-split-mixed-vision gemma-4-26B-A4B-it-qat-Q4_0-16-slots google/gemma-4-26B-A4B-it
 09:46:11  after s-knee
 09:46:15  loaded
+10:14:15  source <scratchpad>/d1.sh
+10:14:15  : 'role-split D1 on gb10-2: unload all, drop the page cache, load set A'\''s 4-slot E4B alone, 30 s idle, then E4B audio at 1 stream for 60 s'
+10:14:15  source <scratchpad>/after.sh
+10:14:15  loaded
+10:14:15  unload --all
+10:14:26  ssh gb10-2 sudo -n /usr/sbin/sysctl vm.drop_caches=3
+10:14:27  memory
+10:14:27  t0=2026-11-10T15:14:27Z
+10:14:27  load ggml-org/gemma-4-E4B-it-GGUF:Q8_0
+10:14:37  curl -s --max-time 10 http://gb10-2:8080/models
+10:14:37  jq -r '.data[] | select(.id == "ggml-org/gemma-4-E4B-it-GGUF:Q8_0") | "full args: " + (.status.args | join(" "))'
+10:14:38  date -u +%FT%TZ
+10:14:38  sleep 30
+10:15:08  : 'set A'\''s 4-slot E4B alone, loaded since 2026-11-10T15:14:27Z, idle 30 s'
+10:15:08  ssh gb10-2 sudo -n /usr/sbin/sysctl vm.drop_caches=3
+10:15:09  memory
+10:15:09  footprint 2026-11-10T15:14:27Z
+10:15:12  cell role-split-d1-audio role-split-diag-audio ggml-org/gemma-4-E4B-it-GGUF:Q8_0 google/gemma-4-E4B-it
+10:16:32  after d1-audio
+10:16:36  loaded
+10:16:37  source <scratchpad>/d2.sh
+10:16:37  : 'role-split D2 on gb10-2: unload all, drop the page cache, load the 16-slot E4B alone, 30 s idle, then E4B audio at 1 stream for 60 s'
+10:16:37  source <scratchpad>/after.sh
+10:16:37  loaded
+10:16:37  unload --all
+10:16:41  ssh gb10-2 sudo -n /usr/sbin/sysctl vm.drop_caches=3
+10:16:41  memory
+10:16:42  t0=2026-11-10T15:16:42Z
+10:16:42  load gemma-4-E4B-it-Q8_0-16-slots
+10:16:52  curl -s --max-time 10 http://gb10-2:8080/models
+10:16:52  jq -r '.data[] | select(.id == "gemma-4-E4B-it-Q8_0-16-slots") | "full args: " + (.status.args | join(" "))'
+10:16:52  date -u +%FT%TZ
+10:16:52  sleep 30
+10:17:22  : 'the 16-slot E4B alone, loaded since 2026-11-10T15:16:42Z, idle 30 s'
+10:17:22  ssh gb10-2 sudo -n /usr/sbin/sysctl vm.drop_caches=3
+10:17:23  memory
+10:17:24  footprint 2026-11-10T15:16:42Z
+10:17:26  cell role-split-d2-audio role-split-diag-audio gemma-4-E4B-it-Q8_0-16-slots google/gemma-4-E4B-it
+10:18:45  after d2-audio
+10:18:50  loaded
+10:18:50  source <scratchpad>/restore.sh
+10:18:50  : 'role-split D1/D2 done, gb10-2 back to Behavior 12'\''s state: unload all, drop the page cache, load the 16-slot 26B-A4B, the 16-slot E4B and granite'
+10:18:50  loaded
+10:18:50  unload --all
+10:18:54  ssh gb10-2 sudo -n /usr/sbin/sysctl vm.drop_caches=3
+10:18:54  memory
+10:18:55  t0=2026-11-10T15:18:55Z
+10:18:55  for s in gemma-4-26B-A4B-it-qat-Q4_0-16-slots gemma-4-E4B-it-Q8_0-16-slots mrutkows/granite-embedding-english-r2-GGUF:BF16
+10:18:55  load gemma-4-26B-A4B-it-qat-Q4_0-16-slots
+10:19:08  load gemma-4-E4B-it-Q8_0-16-slots
+10:19:18  load mrutkows/granite-embedding-english-r2-GGUF:BF16
+10:19:22  date -u +%FT%TZ
+10:19:22  sleep 30
+10:19:52  : 'split set loaded since 2026-11-10T15:18:55Z, idle 30 s'
+10:19:52  ssh gb10-2 sudo -n /usr/sbin/sysctl vm.drop_caches=3
+10:19:53  memory
+10:19:54  footprint 2026-11-10T15:18:55Z
+10:19:56  loaded
 ```
+
+The D1/D2 steps' `curl` and `jq` lines are one pipe, which the trace prints as two; it printed
+each section's full arguments into the step's output, not the log.
 
 Each `cell` printed its summary lines, for example S-agent's (09:22:15):
 
@@ -912,6 +1064,13 @@ Each `cell` printed its summary lines, for example S-agent's (09:22:15):
 ```
 
 and the probe's `watch` printed curl's `400 0.715784s`.
+
+D1's and D2's `cell` printed (10:16:32 and 10:18:45):
+
+```
+1 stream(s): requests ok 59, errored 0, incomplete 1 of 60; output tok/s completed 18.48, every-token 18.48; TTFT median 495 ms; ITL median 22.18 ms; audio s/s 6.77
+1 stream(s): requests ok 58, errored 0, incomplete 0 of 58; output tok/s completed 18.23, every-token 18.23; TTFT median 516 ms; ITL median 21.87 ms; audio s/s 6.61
+```
 
 ### Commands not in a step log
 
@@ -943,6 +1102,19 @@ ssh gb10-2 'docker logs llama 2>&1 | grep -E "^\[45453\]" | grep -E "encode_mtmd
 ssh gb10-2 'docker logs llama 2>&1 | grep -E "^\[44615\]" | grep -E "audio decoded|CLIP using"'
 ```
 
+Section L.7's per-request timings, from the project's root, at 15:20:41Z (read-only: `docker logs`
+on gb10-2), each window a run's 1-stream level from its JSON and each port the E4B child serving it
+(F-audio 52027, S-audio 44615, D1 34633, D2 52363). The scripts are the session's, copied beside
+their output into `.state/role-split/`, which starts with these commands and holds what they printed
+(`audio-diag-gb10-2-2026-11-10.txt`, each command before what it printed); the first 30 s column
+came from the JSON with `jq`:
+
+```sh
+ssh gb10-2 'docker logs --timestamps --since <start> --until <end> llama 2>&1' | python3 -I .state/role-split/srvtimes.py <port>
+python3 -I .state/role-split/client.py .state/measure/gb10-2/role-split-<cell>.json
+jq -r --arg c <cell> '.benchmarks[0] | .start_time as $t0 | [.requests.successful[] | select(.request_end_time - $t0 <= 30) | .input_metrics.audio_seconds / (.request_end_time - .request_start_time)] | sort | "\($c) first 30 s: \(length) ok, RTFx median \(if length%2==1 then .[(length-1)/2] else (.[length/2-1]+.[length/2])/2 end*100|round/100), min \(.[0]*100|round/100)"' .state/measure/gb10-2/role-split-<cell>.json
+```
+
 ## N. Open items for later tasks
 
 None of these is decided here.
@@ -950,6 +1122,10 @@ None of these is decided here.
 - **Vision serializes at the image encode.** About 0.23 requests a second at every stream count in
   both arms; on b12098 the server encodes one slot's image at a time (L.1). Vision held 2 requests
   in the full set and 1 in the split against a load target of 4.
+- **Several llama.cpp vision processes are not pursued**, by the architect's decision: more
+  processes add load on the shared GPU's compute and bandwidth. The open question is the best
+  inference path for vision, audio and embedding, likely each in its own vLLM process, which
+  agent-vllm takes up.
 - **The capped Gemma sections' RSS growth** with no save counted (L.2): 26B-A4B +6138 MiB at 16
   slots by the end of the split arm, not attributed.
 - **Granite's idle-slot saves** (L.3): capping granite is an intake note, by the architect's
@@ -960,20 +1136,22 @@ None of these is decided here.
 - **The agent held 4 sessions on the agent-only GB10, not 9** (I): the 9 is footprint's memory count
   for 131,072-token sessions; the measured 4 is the ITL floor's count for the 4-turn shape, missed at
   8. Sessions of 131,072 tokens stay computed.
-- **Audio slower in the split** at 1 stream (RTFx 6.12 against 11.11), and **the capability
-  host's purposes slower beside each other** in S-knee (L.6): not isolated.
+- **Single-stream audio slower after F-audio** (RTFx 6.12 in S-audio against 11.11 in F-audio):
+  not the 16-slot section's. D1 and D2, each E4B section fresh and alone, matched each other (RTFx
+  6.43 and 6.53, TTFT 495 and 516 ms) and S-audio, with the server's own timings alike in all four
+  runs; the extra time falls between requests, before the router's proxy line, on the laptop, the
+  network or the router, which these reads don't separate (L.7). Its cause is open.
+- **The capability host's purposes slower beside each other** in S-knee (L.6): not isolated.
 - **Neither arrangement held vision or audio at the load target of 4** (F, J).
 - **The 10-minute WAV** is 15,023 tokens, refused by an 8,192-token slot (E); the E4B keeps its
   slot size in this task, and audio past 30 s goes windowed, by the session's decision.
 - **The Gemma 4 output-parser error** on CUDA, 7 requests (L.4), and **GuideLLM's JSON decode
   errors**, 4 requests (L.5).
 - **Hypotheses the spike hasn't measured:**
-  - several vision processes (sections) in place of more slots in one, so that images encode in
-    parallel;
-  - vLLM, which batches the vision encoder across requests, for the vision and audio models;
   - the GPU's compute and memory bandwidth shared between vision and audio (and embedding) as the
     cause of the capability host's mixed-cell misses: memory capacity was never the limit there,
     gb10-2's lowest in any split cell being 68.69 GiB (H);
-  - the split's single-stream audio slowdown (RTFx 6.12 against 11.11, L.6), still unexplained.
+  - what puts 0.4 to 0.6 s (medians) between single-stream audio requests after F-audio (L.7): the laptop,
+    the network path or the router.
 - From footprint's section K, still open (K.4): the Framework's system memory floor and its side of
   the prompt cache, the Gemma models' trained contexts, and the 26B-A4B on Vulkan past 4 slots.
