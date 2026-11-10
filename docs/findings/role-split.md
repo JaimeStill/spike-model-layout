@@ -10,7 +10,8 @@ audio and embedding). It answers evidence 3 (section I) and evidence 4 (section 
 capacity rows it measured beside the [footprint finding](footprint.md)'s table (section K), and
 closes three of footprint's six open items, two of them in part (section K.4). On the way it found that the capped Gemma
 sections still grow their RSS under load, that vision answers about 0.23 requests a second however
-many streams send them, in both arrangements, and that the agent-only GB10 sits 1.39 GiB above its
+many streams send them, in both arrangements, because the server encodes one image at a time
+(L.1), and that the agent-only GB10 sits 1.39 GiB above its
 floor idle. It decides nothing.
 
 | Host | Serves at the end of the session |
@@ -538,13 +539,88 @@ P-cell warm-up ran in this task); "under load" is the highest after any cell in 
 
 ## L. What else was found
 
-### L.1 Vision answers about 0.23 requests a second, whatever the streams
+### L.1 Vision answers about 0.23 requests a second, whatever the streams: one image encode at a time
 
 In both arms the 26B-A4B's requests a second stayed between 0.222 and 0.267 from 1 stream to 12,
 and output tok/s between 22.22 and 26.67 (D.2). TTFT grew by about 2.5 to 2.6 s for each stream
 added: F-vision 2686, 5295, 7861, 10,419 ms at 1 to 4 streams; S-vision 2951 ms at 1, 10,653
-at 4, 20,588 at 8, 30,786 at 12. So added streams wait rather than add throughput, on the 4-slot
-section and on the 16-slot one. Why is not measured here.
+at 4, 20,588 at 8, 30,786 at 12.
+
+**The request timelines.** Each successful or errored request's start and end in S-vision's JSON,
+in seconds from its level's start, are saved in `.state/role-split/s-vision-timelines-2026-11-10.txt`
+(read from `.state/measure/gb10-2/role-split-s-vision.json` with `jq`, below). At 1 stream each
+request took 4.27 to 4.52 s, one after another. At 4 streams the first wave's four requests all
+started at 0 s and all ended together:
+
+```
+# streams start end duration ttft_ms
+4 0 13.28 13.28 10671
+4 0 13.25 13.25 10642
+4 0 13.29 13.29 10694
+4 0 13.31 13.3 10692
+```
+
+At 16 streams the first wave's sixteen requests started between 0 and 0.77 s and all ended
+between 52.79 and 52.86 s, TTFT 45,782 to 46,547 ms. So a wave of n requests takes about n times
+3.3 s (c: 13.3 / 4, 52.8 / 16), and its requests finish together: no request gets its first token
+until every image in the wave is in. F-vision's 4-slot section shows the same at its 4 slots: its
+first four requests at 4 streams ended at 12.98 to 13.04 s, and at 8 streams four ended at 12.88 s
+and the next at 25.8 s.
+
+**The router log.** gb10-2's router log for process `[45453]`, the 16-slot 26B-A4B, read
+read-only at 14:59:52Z with the command below and saved in
+`.state/role-split/vision-encode-gb10-2-2026-11-10.log` (its timestamps are minutes, seconds,
+milliseconds and microseconds since the process started, during the 14:10:34Z load). The
+projector loads on the GPU, with the section's minimum image size:
+
+```
+[45453] 0.11.604.962 I clip_ctx: CLIP using CUDA0 backend
+[45453] 0.11.605.113 I load_hparams: image_min_pixels:   1290240 (custom value)
+```
+
+S-vision's first 4-stream wave, as logged: each slot logs `encoding mtmd batch`, then
+`decoding image batch` about 2 s later, then the LLM's `image decoded` in under 90 ms, and only then
+does the next slot's encode begin; the four prompt evals end within 54 ms of each other:
+
+```
+[45453] 13.33.890.299 I slot encode_mtmd_: id  5 | task 2108 | encoding mtmd batch from idx = 212, n_chunks = 1
+[45453] 13.35.977.067 I decoding image batch 1/1, n_tokens_batch = 1100
+[45453] 13.36.062.858 I image decoded (batch 1/1) in 86 ms
+[45453] 13.36.448.094 I slot encode_mtmd_: id  6 | task 2110 | encoding mtmd batch from idx = 212, n_chunks = 1
+[45453] 13.38.501.171 I decoding image batch 1/1, n_tokens_batch = 1100
+[45453] 13.38.588.025 I image decoded (batch 1/1) in 87 ms
+[45453] 13.38.934.010 I slot encode_mtmd_: id  7 | task 2112 | encoding mtmd batch from idx = 212, n_chunks = 1
+[45453] 13.40.982.857 I decoding image batch 1/1, n_tokens_batch = 1100
+[45453] 13.41.065.725 I image decoded (batch 1/1) in 83 ms
+[45453] 13.41.067.729 I slot encode_mtmd_: id  8 | task 2113 | encoding mtmd batch from idx = 212, n_chunks = 1
+[45453] 13.43.324.748 I decoding image batch 1/1, n_tokens_batch = 1100
+[45453] 13.43.411.470 I image decoded (batch 1/1) in 86 ms
+[45453] 13.46.472.576 I slot print_timing: id  5 | task 2108 | prompt eval time =    5275.45 ms /  1318 tokens (    4.00 ms per token,   249.84 tokens per second)
+[45453] 13.46.500.307 I slot print_timing: id  6 | task 2110 | prompt eval time =   10029.02 ms /  1318 tokens (    7.61 ms per token,   131.42 tokens per second)
+[45453] 13.46.522.442 I slot print_timing: id  7 | task 2112 | prompt eval time =   10073.65 ms /  1318 tokens (    7.64 ms per token,   130.84 tokens per second)
+[45453] 13.46.525.949 I slot print_timing: id  8 | task 2113 | prompt eval time =   10064.14 ms /  1318 tokens (    7.64 ms per token,   130.96 tokens per second)
+```
+
+Over the whole extract (201 encodes, S-vision, S-mixed and S-knee), no two encodes overlap: every
+`encoding mtmd batch` line is followed by its own `decoding image batch` before the next one. The
+gap between them ran 2.05 to 6.03 s, median 2.27 s (c, from the extract); the `image decoded` step
+82 to 253 ms, median 85 ms. A single request's prompt eval, 1318 tokens, logged 2537.64 to 2761.42
+ms alone (the first five at 1 stream), and the first slot of a 4-stream wave 5275.45 ms
+(another, later, 5272.11 ms); the slots behind it about 10 s.
+
+**The mechanism, as this build shows it.** On llama-server b12098, with the 26B-A4B's image
+encoder on CUDA0, the server encodes each slot's image in turn, one slot at a time, in its slot
+processing (the `slot encode_mtmd_` lines), while the LLM's own image-token decode takes under
+0.3 s and the output decode is batched across slots (D.2: ITL 13.86 ms at 1 stream, 26.50 at 4).
+So added slots and streams add waiting, not throughput: vision throughput stays near one request
+per wave-time per image, about 0.23 to 0.30 a second (c: 1 / 3.3 s), whatever the slot count.
+This is the behavior observed on this build and these sections, not a claim about llama.cpp in
+general. The 4-slot section's own log lines were not read; its timelines (above) match.
+
+**Audio, for contrast.** The 16-slot E4B's log, process `[44615]`, read the same way and saved in
+`.state/role-split/audio-encode-gb10-2-2026-11-10.log`: 458 `audio decoded (batch 1/1)` lines, 10
+to 118 ms, median 15 ms (c, from the extract), its encoder also on CUDA0 (`clip_ctx: CLIP using
+CUDA0 backend`).
 
 ### L.2 The capped Gemma sections still grow their RSS
 
@@ -857,13 +933,23 @@ python3 -I <scratchpad>/levels.py <agent|vision|audio|embed> .state/measure/<hos
 jq -r '.benchmarks[] | (.config.strategy.streams|tostring) as $s | .requests.errored[]? | "s=\($s): \(.info.error)"' .state/measure/<host>/role-split-<cell>.json
 ```
 
+Section L.1's timelines and router-log extracts, from the project's root, at 14:59:52Z for the log
+reads (read-only: `docker logs` on gb10-2, nothing loaded, unloaded or requested). Each saved file
+starts with the command that made it:
+
+```sh
+jq -r '.benchmarks[] | .config.strategy.streams as $s | .start_time as $t0 | [.requests.successful[], .requests.errored[]] | sort_by(.request_start_time)[] | "\($s) \((.request_start_time-$t0)*100|round/100) \((.request_end_time-$t0)*100|round/100) \((.request_end_time-.request_start_time)*100|round/100) \(.time_to_first_token_ms // "-" | if type=="number" then round else . end)"' .state/measure/gb10-2/role-split-s-vision.json
+ssh gb10-2 'docker logs llama 2>&1 | grep -E "^\[45453\]" | grep -E "encode_mtmd_|decoding image batch|image decoded|prompt eval time|CLIP using|image_min_pixels"'
+ssh gb10-2 'docker logs llama 2>&1 | grep -E "^\[44615\]" | grep -E "audio decoded|CLIP using"'
+```
+
 ## N. Open items for later tasks
 
 None of these is decided here.
 
-- **Vision serializes.** About 0.23 requests a second at every stream count in both arms (L.1);
-  more streams added waiting, not throughput. Vision held 2 requests in the full set and 1 in the
-  split against a load target of 4.
+- **Vision serializes at the image encode.** About 0.23 requests a second at every stream count in
+  both arms; on b12098 the server encodes one slot's image at a time (L.1). Vision held 2 requests
+  in the full set and 1 in the split against a load target of 4.
 - **The capped Gemma sections' RSS growth** with no save counted (L.2): 26B-A4B +6138 MiB at 16
   slots by the end of the split arm, not attributed.
 - **Granite's idle-slot saves** (L.3): capping granite is an intake note, by the architect's
@@ -881,5 +967,13 @@ None of these is decided here.
   slot size in this task, and audio past 30 s goes windowed, by the session's decision.
 - **The Gemma 4 output-parser error** on CUDA, 7 requests (L.4), and **GuideLLM's JSON decode
   errors**, 4 requests (L.5).
+- **Hypotheses the spike hasn't measured:**
+  - several vision processes (sections) in place of more slots in one, so that images encode in
+    parallel;
+  - vLLM, which batches the vision encoder across requests, for the vision and audio models;
+  - the GPU's compute and memory bandwidth shared between vision and audio (and embedding) as the
+    cause of the capability host's mixed-cell misses: memory capacity was never the limit there,
+    gb10-2's lowest in any split cell being 68.69 GiB (H);
+  - the split's single-stream audio slowdown (RTFx 6.12 against 11.11, L.6), still unexplained.
 - From footprint's section K, still open (K.4): the Framework's system memory floor and its side of
   the prompt cache, the Gemma models' trained contexts, and the 26B-A4B on Vulkan past 4 slots.
