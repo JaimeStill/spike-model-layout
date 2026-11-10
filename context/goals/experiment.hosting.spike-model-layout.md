@@ -1,8 +1,8 @@
 # goal · experiment.hosting.spike-model-layout
 
-- **State:** idle
-- **Task:** none
-- **Branch:** none
+- **State:** building
+- **Task:** framework
+- **Branch:** framework
 
 ## Tasks
 
@@ -15,201 +15,208 @@
 7. [ ] two-node
 8. [ ] answer
 
-## Task brief · role-split
+## Task brief · framework
 
 ```
-Problem       Set A on one GB10 can't hold its floor under vision load:
-              its Gemma sections leave llama.cpp's host prompt cache at
-              8192 MiB a process, which took gb10-1 to 10.39 GiB under
-              L2. Every computed placement assumes the cap that fixes
-              it, and the cap hasn't landed. Nothing has measured how
-              many sessions or requests each placed model holds at its
-              context before its knee or speed floor. Nothing has
-              measured whether splitting the roles across both GB10s
-              (one serving the agent alone, the other vision, audio and
-              embedding) holds more, faster, and with more memory left
-              than set A on one. The framework, agent-vllm and two-node
-              tasks all start from that comparison.
-Behaviors     1. Every GB10 has no pending OS updates at the session's
-                 start; each GB10's stack and tailscale ping are
-                 recorded with the date. The Framework is read only:
-                 no update, load, unload, request or clone change.
-              2. A pull request to spike-model-engines' host/, citing
-                 the footprint finding (sections G, I.4, K), changes the
-                 shared preset:
-                 - set A's 26B-A4B QAT and E4B sections gain
-                   cache-ram 0, cache-idle-slots false and
-                   ctx-checkpoints 2;
-                 - a new gpt-oss-120b agent-only section: one unified
-                   KV pool of c 1,179,648 over 16 slots, with set-a's
-                   keys (checkpoint-min-step 4096, cache-ram 0,
-                   cache-idle-slots false, its sampling);
-                 - a new 16-slot 26B-A4B QAT section (c 131072, 8,192
-                   a slot) with set A's vision keys and the cap keys;
-                 - a new 16-slot E4B Q8_0 section (c 131072, 8,192 a
-                   slot) with the cap keys.
-                 The engines suite's check passes, and its currency
-                 reports only held items. Before merge the branch
-                 reaches gb10-1 and gb10-2 by a push to each host's
-                 hosts-next and a local hosts branch, and each router
-                 restarts to read it. The Framework's clone is never
-                 touched. Each section's loaded arguments, as `load`
-                 prints them, show its keys.
-              3. Before either arm, anchors A and B run once each on
-                 each GB10, each on a freshly loaded set-a section
-                 alone. Each host's output tok/s and ITL fall within
-                 the hosts finding's run noise of each other (A 2.37%,
-                 B 2.2%). A miss is repeated once; a second miss is a
-                 finding and blocks comparing cells across the GB10s.
-              4. Full-set arm, on gb10-2. Set A with the capped Gemma
-                 sections is loaded fresh from a dropped page cache;
-                 after 30 s idle, each process and the pool are read.
-                 L2 reruns unchanged and completes all 32 requests
-                 with the pool above 12.2 GiB throughout. The 26B-A4B's
-                 RSS growth is set against footprint's 1217 -> 10397
-                 MiB.
-              5. Each knee sweep records every level's output tok/s,
-                 TTFT, ITL and errors, and GuideLLM's knee estimate.
-                 Agent, vision and audio are each judged by the
-                 policy's purpose floor for every stream: agent decode
-                 >=10 tok/s (ITL <=100 ms); vision <=10 s an image
-                 question; audio RTFx >=5. Granite is judged at
-                 >=4,300 prompt tok/s. A model "holds" the highest
-                 level that meets its floor at or below its knee.
-              6. The 10-minute WAV probe sends one request to gb10-2's
-                 set A E4B (8,192 tokens a slot). The finding quotes
-                 either its usage (input tokens, against 15,028) and
-                 time, or its error as returned. No section changes on
-                 its result in this task.
-              7. Each mixed cell starts four GuideLLM processes
-                 together, each capped at 240 s. For each purpose it
-                 records the per-stream figures against that purpose's
-                 floor, the pool's lowest during the cell, and each
-                 process after it.
-              8. Split arm. gb10-1 loads the agent-only section alone
-                 from a dropped cache; its figure is set against the
-                 computation (4.1 GiB above the floor if compute stays
-                 at its c 131,072 figure, ~1.9 GiB if the mask grows).
-                 gb10-2 loads the 16-slot 26B-A4B, the 16-slot E4B and
-                 granite. Every section's logged buffers are recorded,
-                 the Gemma compute at 16 slots and gpt-oss's unified
-                 compute at c 1,179,648 among them.
-              9. Every cell runs under `watch`, memory sampled every
-                 10 s, with the floor at 12.2 GiB on both GB10s and a
-                 10 min cap. Memory is read after every cell. Within an
-                 arm nothing reloads after its fresh load, except as
-                 slice 1 states. A cell that falls under the floor is
-                 stopped and recorded as a finding.
-             10. The role-split finding names every run (tool,
-                 configuration, load, duration, the decision it
-                 informs) and quotes every command as run from the
-                 step log. It answers evidence 3: per placed model, the
-                 sessions or requests held at its context, by output
-                 tok/s, TTFT and ITL. It answers evidence 4: full set
-                 against split, with each arrangement's holding at the
-                 load targets and at its knees, per-stream speed, and
-                 memory left on each host.
-             11. The finding adds the capacity rows it measured, each
-                 marked measured: the capped Gemma sections' warmed and
-                 under-load figures; Gemma compute at 16 slots;
-                 gpt-oss's unified compute and pool at c 1,179,648. It
-                 states which of footprint's section K items it closes.
-                 The living layout document gives each GB10 its
-                 measured role figures, and its sizing cites these rows
-                 beside footprint's table.
+Problem       Role-split found that gb10-2, the capability host, misses
+              vision and audio together even at 1 stream each (vision
+              10.14 s, audio RTFx 2.26) with 68.85 GiB free, and neither
+              arrangement held vision or audio at the load target of 4.
+              The agent met its target alone on gb10-1. The Framework
+              hasn't been measured in any role since footprint, and then
+              only uncapped, with its prompt cache in system memory that
+              the GTT floor watch can't see. Nothing has measured whether
+              a second capability host, the Framework serving vision,
+              audio and embedding beside gb10-2, adds the capacity a
+              router could spread across, or what the Framework holds at
+              each purpose's floor.
+Behaviors     1. Every host has no pending OS updates at the session's
+                 start: the Framework's 4 (pacman) and each GB10's 3 (apt)
+                 applied by the architect. Each host's stack is recorded,
+                 and `tailscale ping` to each host is recorded with the
+                 date before every run. Runs go on whatever path the
+                 laptop has; the finding names each run's path and notes
+                 that off-LAN latency may slightly affect client-side
+                 timing figures (TTFT, request latency, RTFx).
+              2. The Framework's spike-model-engines clone moves from
+                 3260dd0 to main at 21b5e8c, and its router restarts to
+                 read it. Its /models lists main's 12 sections, and set
+                 A's two Gemma sections, when loaded, print cache-ram 0,
+                 no-cache-idle-slots and 2 checkpoints. No step loads
+                 the 16-slot 26B-A4B, the 16-slot E4B or the agent-only
+                 section on the Framework. No pull request to host/.
+              3. The Framework's store holds only set A's four models:
+                 the Gemma 4 12B, 31B and E4B QAT GGUFs and granite's
+                 safetensors are removed. Their preset sections stay
+                 listed and don't load, as on the GB10s.
+              4. On an amdgpu host, the step helpers' memory read and
+                 watch's samples carry system MemAvailable beside GTT.
+                 watch stops a cell when either falls under its floor:
+                 GTT 11.2 GiB, system memory 12.5 GiB (10% of 128,075
+                 MiB). A cell's summary gives the lowest of each. A GB10
+                 reads and stops as before (MemAvailable, 12.2 GiB). The
+                 check passes.
+              5. Anchors A and B run once each on the Framework, each on
+                 a freshly loaded gpt-oss-120b set-a section alone. Output
+                 tok/s and ITL are read against the hosts finding's R3
+                 and R4 (b12098: A 43.90, B 70.72 tok/s) within the
+                 Framework's across-days 2.8%. They don't block anything:
+                 a miss is a finding. The Framework's figures are never
+                 compared with the GB10s' as host parity.
+              6. Baseline. Before the first baseline cell, gb10-1 reloads
+                 the agent-only section, and gb10-2 the 16-slot 26B-A4B,
+                 the 16-slot E4B and granite, each from a dropped page
+                 cache. Both pools are read after 30 s idle. Nothing on
+                 either GB10 reloads after that in the session.
+              7. The Framework's arrangement. The Framework unloads
+                 everything and loads set A's 26B-A4B and E4B (capped,
+                 4 x 8,192) and granite (16 x 8,192), nothing else. After
+                 30 s idle, its GTT, system memory and each process (GTT,
+                 RSS) are read and set against the computed ~83.0 GiB
+                 GTT and ~87 GiB system memory available, along with
+                 every logged buffer. Its capped rows (idle, after each
+                 cell, highest) are set against footprint's uncapped
+                 Framework rows, the 26B-A4B's RSS growth among them.
+              8. Each Framework knee sweep records every level's output
+                 tok/s, TTFT, ITL and errors, and GuideLLM's knee. Each
+                 purpose is judged by its floor (vision <=10 s an image
+                 question, audio RTFx >=5, embedding >=4,300 prompt
+                 tok/s), with role-split's rule for "holds" and the same
+                 jq and awk readers.
+              9. Each mixed cell starts all of its GuideLLM processes
+                 together, each capped at 240 s, launched from each host's
+                 own step script. The baseline arm runs 4 processes, the
+                 Framework arm 7. In the Framework arm each capability
+                 purpose's streams split evenly between gb10-2 and the
+                 Framework. For each purpose and each host, the cell
+                 records the per-stream figures against the purpose's
+                 floor, and the purpose's combined holding against its
+                 load target. It also records each pool's lowest during
+                 the cell (both of the Framework's) and each process
+                 after it.
+             10. Every cell runs under watch, sampled every 10 s, capped
+                 at 10 min, and memory is read after every cell. A cell
+                 that falls under a floor is stopped and recorded as a
+                 finding.
+             11. The framework finding names every run (tool,
+                 configuration, load, duration, path, the decision it
+                 informs) and quotes every command behind a figure, and
+                 every command that changes a host, from the step log.
+                 It answers evidence 5: what the Framework holds per
+                 purpose as a capability host, and what the split plus
+                 the Framework holds at the load targets and at the held
+                 levels against the baseline from this session, with
+                 memory left on each host. It adds the Framework's
+                 per-purpose rows to evidence 3, and its capped capacity
+                 rows, marked measured. It closes footprint's open items
+                 on the Framework's prompt cache and system-memory floor,
+                 and the 26B-A4B on Vulkan past 4 slots: untested,
+                 because the fix (#25584) is in no build and more slots
+                 add no vision throughput (role-split L.1). The living
+                 layout document's hosts and sizing gain the Framework's
+                 role and figures.
              12. At the session's end gb10-1 serves the agent-only
-                 section, and gb10-2 the 16-slot 26B-A4B, the 16-slot
-                 E4B and granite. Both clones stay on the hosts branch
-                 until the pull request merges, then return to main.
-                 The Framework is unchanged, serving set A from main.
-Test seams    Each GB10's router API (/health, /models, load and
-              unload), driven by the step helpers one step at a time;
-              the `footprint` and `memory` read-outs and the router's
-              load log, the step log their record; GuideLLM's result
-              files for every cell, the knee conclusion among them; the
-              probe's HTTP response.
-Slices        1. The pull request, the anchors, and the full-set arm on
-                 gb10-2. The architect runs any root updates the hosts
-                 need. Write the pull request and push it to both GB10s'
-                 hosts-next, then restart both routers. Add the cell
-                 scenarios. Then, every cell GuideLLM 0.8.1 from the
-                 laptop, run by `cell` under `watch`:
-                   AA/AB  anchors A and B on gb10-1, then gb10-2, each
-                      on a fresh set-a load alone, ~9 min in all: whether
-                      cells compare across the GB10s
-                 gb10-2: unload all, drop the cache, load capped set A,
+                 section; gb10-2 its 16-slot 26B-A4B, 16-slot E4B and
+                 granite; the Framework set A's capped 26B-A4B, E4B and
+                 granite, with gpt-oss unloaded. All three clones are on
+                 main at 21b5e8c.
+Test seams    Each host's router API (/health, /models, load and unload),
+              driven by the step helpers one step at a time; the memory,
+              footprint and watch read-outs (both pools on the Framework)
+              and the router's load log, with the step log as their
+              record; GuideLLM's result files for every cell, the knee
+              conclusion among them.
+Slices        1. Hosts, helpers and the baseline. The architect applies
+                 the root updates on all three hosts. Move the Framework's
+                 clone to 21b5e8c and restart its router; clear its store
+                 extras; make watch and memory read both of the
+                 Framework's pools, stopping under either floor. Then,
+                 each cell GuideLLM 0.8.1 from the laptop, run by `cell`
+                 under watch:
+                   FA/FB anchors A and B (`anchor-a`, `anchor-b`) on the
+                      Framework, each on a fresh set-a load alone, ~3.5
+                      min in all: whether the Framework's speed held
+                      since the hosts task
+                 gb10-1 and gb10-2 reload the split fresh (Behavior 6),
                  idle 30 s, read. Then:
-                   F-L2 L2 unchanged: vision at 1440p, 4 streams x 32,
-                      200 text tokens, 64 out, ~2.5 min: whether the
-                      cap holds set A above the floor
-                   F-agent gpt-oss set-a, knee [1,2,3,4,8], 110 s a
-                      level, 4-turn sessions (8,192 first turn, then
-                      3 x 512 in; 512 out each turn), ~9.5 min: the
-                      agent's sessions held beside the rest of set A
-                   F-vision 26B-A4B, knee [1,2,3,4,8], 60 s a level,
-                      one 1440p JPEG + 200 text tokens, 100 out,
-                      ~5.5 min: vision requests held in the full set
-                   F-audio E4B, knee [1,2,3,4,8], 30 s a level, at most
-                      64 requests a level, the 73 LibriSpeech clips,
-                      ~3 min: audio requests held in the full set
-                   F-embed granite, concurrent [1,2,4,8,16], 30 s each,
-                      512-token inputs, ~3 min: embedding throughput
-                      against its floor
-                   F-probe the first 10 minutes of AMI ES2002a (16 kHz
-                      mono WAV, cut on the laptop) to E4B's
-                      /v1/audio/transcriptions by curl, once, ~1 min:
-                      whether an 8,192-token slot takes 15,028 tokens
-                   F-mixed agent 4 sessions, vision 4, audio 4,
-                      embedding 16, all at once, 240 s each, ~5 min:
-                      what the full set holds at its load targets
-                 Demo: the anchors' parity, F-L2 above the floor, and
-                 the full set's levels held per purpose.
-              2. The split. gb10-2: unload all, drop the cache, load
-                 the 16-slot 26B-A4B, the 16-slot E4B and granite.
-                 gb10-1: drop the cache, load the agent-only section.
-                 Read both hosts. Then:
-                   S-agent gb10-1 agent-only, knee [1,4,8,12,16], 110 s
-                      a level, F-agent's sessions, ~9.5 min: the agent's
-                      sessions held alone on a GB10
-                   S-vision gb10-2 16-slot 26B-A4B, knee [1,4,8,12,16],
-                      90 s a level, F-vision's requests, ~7.5 min
-                   S-audio gb10-2 16-slot E4B, knee [1,4,8,12,16], 30 s
-                      a level, at most 64 requests a level, ~3 min
-                   S-mixed F-mixed's load, gb10-1 and gb10-2 at once,
-                      240 s, ~5 min: the split at the full set's targets
-                   S-knee each purpose at its split knee from S-agent,
-                      S-vision and S-audio (granite at 16), both hosts
-                      at once, 240 s, ~5 min: what the split holds
-                 Both GB10s end serving as Behavior 12 states.
-                 Demo: the agent-only load against its computation, and
-                 S-mixed against F-mixed.
-              3. The finding and docs. Write the role-split finding:
-                 evidence 3's per-model table, evidence 4's comparison,
-                 the probe's result, the new capacity rows marked
-                 measured, every run named, the commands quoted. Update
-                 the layout document's hosts and sizing.
-                 Demo: the comparison table, and one placement read
-                 from it (the agent-only GB10's sessions held against
-                 footprint's computed 9).
-              4. The architect's walkthrough: the agent-only section's
-                 footprint read reproduced on gb10-1 from the finding's
-                 commands; one S-agent level (4 streams, 110 s) rerun as
-                 its own cell and read against the finding; the
-                 comparison table read for one placement.
-Out of scope  Any new tool; any step on the Framework, its clone or its
-              preset; sections beyond the five named; the E4B's slot
-              size, whatever the probe shows; adaptive knee refinement;
-              agent sessions deeper than the 4-turn shape (131,072-token
-              sessions stay computed); granite's sweep in the split;
-              llama.cpp past b12098; vLLM; on-demand loading; routing
-              (each cell targets its host directly); speed comparisons
-              with earlier sessions beyond the anchors.
-Door          two-way: the pull request reverts by commit, and its
-              sections are additions or keys on existing ones. Hosts
-              change only through the router's load and unload, the
-              clone's branch and a router restart, none needing root.
-              The page-cache drop uses the existing sudoers rule. The
-              Framework is untouched. No pin, image or store changes.
+                   B-target the split at the load targets, 240 s, ~5
+                      min: gb10-1 agent 4 (`role-split-mixed-agent`,
+                      agent-only); gb10-2 vision 4, audio 4, embedding 16
+                      (`role-split-mixed-vision`, `-audio`, `-embed`,
+                      its 16-slot sections and granite): what one
+                      capability host gives at the targets this session
+                   B-held the split at role-split's held levels, 240 s,
+                      ~5 min: gb10-1 agent 4; gb10-2 vision 1, audio 1,
+                      embedding 16: the baseline the second capability
+                      host is set against
+                 Demo: the Framework's anchors against R3/R4, a Framework
+                 cell's watch showing both pools, and B-target and
+                 B-held per purpose.
+              2. The Framework as a second capability host. The Framework
+                 unloads everything, loads the capped 26B-A4B, E4B and
+                 granite, idles 30 s, and is read. gb10-1 and gb10-2 stay
+                 as slice 1 left them. Then:
+                   X-vision the Framework's 26B-A4B
+                      (`role-split-vision-full`), knee [1,2,3,4,8], 60 s
+                      a level, one 1440p JPEG + 200 text tokens, 100 out,
+                      ~5.5 min: vision requests the Framework holds
+                   X-audio the Framework's E4B (`role-split-audio-full`),
+                      knee [1,2,3,4,8], 30 s a level, at most 64 requests
+                      a level, the 73 LibriSpeech clips, ~3 min: audio
+                      requests the Framework holds
+                   X-embed the Framework's granite (`role-split-embed`),
+                      concurrent [1,2,4,8,16], 30 s each, 512-token
+                      inputs, ~3 min: embedding throughput against its
+                      floor
+                   P-target the split plus the Framework at the load
+                      targets, 240 s, ~5 min: gb10-1 agent 4; vision 2 on
+                      gb10-2 + 2 on the Framework; audio 2 + 2; embedding
+                      8 + 8: whether two capability hosts reach the
+                      targets
+                   P-held the split plus the Framework at the held
+                      levels, 240 s, ~5 min: gb10-1 agent 4; vision 1 +
+                      1; audio 1 + 1; embedding 8 + 8: whether a second
+                      host doubles what one held
+                 All three hosts end serving as Behavior 12 states.
+                 Demo: the Framework's held levels per purpose, and
+                 P-target and P-held against B-target and B-held.
+              3. The finding and docs. Write the framework finding:
+                 evidence 5's comparison, the Framework's per-purpose
+                 rows for evidence 3, its capped capacity rows marked
+                 measured, the closed footprint items, every run with
+                 its path, and the commands quoted. Update the layout
+                 document's hosts and sizing.
+                 Demo: the comparison table, and one placement read from
+                 it (combined vision holding against the target of 4).
+              4. The architect's walkthrough on the Framework: unload
+                 all and reload its three capability sections from the
+                 finding's commands, and read both pools and the
+                 processes against the finding; then rerun, as its own
+                 cell, one level of the Framework sweep for the purpose
+                 it holds least of, at that held level, ~5 min, and read
+                 it against the finding with both floors watched.
+Out of scope  Any new tool; any pull request to host/, including updating
+              llama.env's hold reason or the 16-slot section's "GB10
+              only" comment (pending edits); Gemma 4 26B-A4B or E4B past
+              4 slots on Vulkan; loading the 16-slot or agent-only
+              sections on the Framework; gpt-oss on the Framework beyond
+              the anchors (agent overflow stays computed); anchors on the
+              GB10s; sweeps on gb10-2; splits other than even; routing
+              (each process targets its host directly); granite's cache
+              keys; audio past 8,192 tokens a slot; adaptive knee
+              refinement; llama.cpp past b12098; vLLM, including the
+              Framework running gb10-2's capability workload and
+              configuration on vLLM, which agent-vllm takes up (pending
+              roadmap edit); on-demand loading; speed comparisons with
+              role-split's figures beyond citing them.
+Door          two-way: the clone move and router restart revert by
+              checking out 3260dd0 and restarting; the step-helper edit
+              reverts by commit; host changes are only router loads and
+              unloads, the clone's commit and a restart. The store
+              extras re-download from Hugging Face if a later task needs
+              them. No pull request, pin, image or preset changes. Root
+              is the architect's (the OS updates); the page-cache drop
+              uses the existing sudoers rule on the GB10s.
 ```
 
 
@@ -316,6 +323,26 @@ Door          two-way: the pull request reverts by commit, and its
 - role-split (BUILD, review escalation): the audio gap was timed by curl, one 6 s clip (192 KB WAV) to gb10-2's 16-slot E4B: from gb10-1 (direct, 2 ms) 0.38-0.42 s; from the laptop (DERP(iad), 61 ms) 0.77-0.92 s, the first 1.19 s. The 0.4 s difference is the request's trip over the relay, not inference.
 - role-split (BUILD): production clients sit on the same direct network as the GPUs in the datacenter, so the layout is sized on LAN figures; the split arm's client-side figures (relay) read as pessimistic and its server-side figures stand; the relay cost measured in L.7 is a fact of off-network use, not a requirement for spike-model-gateway or something the layout optimizes (the architect).
 
+
+- framework: the Framework takes the capability-host role, chosen from role-split's findings: vision and audio missed together on gb10-2's one GPU with 68.85 GiB free, the agent met its target alone, and Vulkan's 4-slot limit on the 26B-A4B costs vision nothing (one image encode at a time); rejected: overflow for the agent (stays computed, 9 sessions of 131,072 alone), overflow for the full set.
+- framework: the Framework serves vision, audio and embedding as added capacity beside gb10-2, which keeps its 16-slot 26B-A4B, 16-slot E4B and granite; each capability purpose has two hosts (the architect).
+- framework: the Framework's one starting-state adjustment: its clone moves from 3260dd0 to main at 21b5e8c and its router restarts, giving set A's Gemma sections the prompt-cache cap; no step loads the 16-slot or agent-only sections there.
+- framework: watch samples system MemAvailable beside GTT on an amdgpu host, with a system floor of 12.5 GiB (10% of 128,075 MiB) beside GTT's 11.2 GiB, and stops a cell under either; an edit to the step helpers, not a new tool.
+- framework: Gemma 4 26B-A4B past 4 slots on Vulkan stays untested: the fix (#25584) is in no build, and more slots add no vision throughput on b12098 (role-split L.1); footprint's open item closes with both reasons.
+- framework: the baseline (the split as it serves now) reruns in this session; role-split's figures are cited, not compared.
+- framework: runs go on whatever path the laptop has, with `tailscale ping` recorded for every run; the finding notes that off-LAN latency may slightly affect client-side timing figures (the architect).
+- framework: held llama.cpp (gb10) and (strix-halo) at b12098: the -hf tag matching (#31620, #31639, in common/download.cpp) is unchanged through b12242; common/download.cpp and hf-cache.cpp untouched since 2026-11-05.
+- framework: the Framework's store extras (Gemma 4 12B, 31B and E4B QAT GGUFs; granite's safetensors) cleared, as gb10-1's were: nothing this spike or a planned goal runs reads them.
+- framework: the Framework serves set A's 26B-A4B and E4B at 4 x 8,192 (capped) and granite at 16 x 8,192; no pull request to host/; rejected: Framework sections with other slot counts.
+- framework: the Framework is swept per purpose at role-split's full-set levels (vision [1,2,3,4,8] 60 s; audio [1,2,3,4,8] 30 s, at most 64 requests; embedding concurrent [1,2,4,8,16] 30 s), one purpose at a time with the other two idle.
+- framework: in the Framework arm's mixed cells each capability purpose's streams split evenly between gb10-2 and the Framework (vision 2+2, audio 2+2, embedding 8+8 at the targets); rejected: a split by footprint's speed ratios.
+- framework: mixed cells at the load targets and at role-split's held levels, each on the baseline and on the Framework arm, 240 s each.
+- framework: gpt-oss-120b set-a on the Framework is loaded only for the anchors, then unloaded.
+- framework: anchors A and B once each on the Framework only, read against the hosts finding's R3/R4 within its across-days 2.8% as a record, not a gate; no GB10 anchors; the Framework's figures are compared with the GB10s' as arrangements, never as host parity.
+- framework: the session ends with the split plus the Framework serving (gb10-1 agent-only; gb10-2 its 16-slot sections and granite; the Framework its three capped capability sections); all three clones on main at 21b5e8c.
+- framework: when agent-vllm runs, the Framework runs gb10-2's capability workload and configuration on vLLM as well; a pending roadmap edit, not this task's work (the architect).
+- framework: the walkthrough reloads the Framework's capability sections from the finding's commands, reads both pools, and reruns one level of the sweep for the purpose it holds least of, as its own cell.
+
 ## Pending edits
 
 - coordinator · ai-hosting.md "Hosts and access": the drop-caches rule on both GB10s.
@@ -332,3 +359,6 @@ Door          two-way: the pull request reverts by commit, and its
 - spike-model-engines · intake note: granite's section sets no cache keys, so every embedding request saves its idle slot to the prompt cache (177,657 saves in one 2.5-min sweep on gb10-2); `cache-idle-slots = false` and `cache-ram = 0` would stop it (spike-model-layout `docs/findings/role-split.md`).
 - coordinator · roadmap.toml, experiment.hosting.spike-model-layout task agent-vllm (and context/README.md, Path 5 and the Capabilities line "The vLLM agent comparison"): widen it from gpt-oss-120b alone to the vision (Gemma 4 26B-A4B), audio (E4B) and embedding (granite) models on vLLM in containers, each in its own process, alone and together on the capability GB10, against llama.cpp; role-split found llama-server b12098 encodes images one slot at a time (~0.23 req/s whatever the slots) and vision and audio missing their floors together (`docs/findings/role-split.md`, L.1, N).
 - coordinator · intake note (ai-hosting.md, experiment.hosting, the rules' "Benchmarks"): production clients sit on the same direct network as the GPUs, so the layout is sized on LAN figures (the architect). A cell run from the laptop over a Tailscale relay carries the relay's trip in its client-side figures (TTFT, request latency, RTFx), about 0.4 s for a 6 s audio clip, and its server-side figures are unaffected (spike-model-layout `docs/findings/role-split.md`, "Stack, engine and network path" and L.7). The `tailscale ping` each run records shows which path it took.
+- coordinator · roadmap.toml, experiment.hosting.spike-model-layout task agent-vllm (and context/README.md, Path 5 and the Capabilities line "The vLLM agent comparison"), beside the widening edit: the Framework also runs gb10-2's capability workload and configuration (vision, audio and embedding, each in its own process) on vLLM, in a container, against its llama.cpp figures from the framework task (the architect). spike-model-engines' official vLLM ROCm image ships no audio decoder, so an audio request returns 500; the audio-extra probe image covers that (spike-model-engines context/README.md:287-288).
+- spike-model-engines · intake note: host/llama.env's hold comment says "checked still unrestored through b12211"; the framework task found it unchanged through b12242. The next pull request to host/ (agent-vllm's vLLM pin) can carry the new build number.
+- spike-model-engines · intake note: the preset's `gemma-4-26B-A4B-it-qat-Q4_0-16-slots` comment ("on Vulkan the section aborts past 4 slots") is broader than measured: aborts were at 16 x 131,072 (#29082) and 15 x 131,072 (#29221); 4 x 8,192 runs; 5-14 slots and 16 x 8,192 never ran on Vulkan; #29221's report crashes at -np 4 with 262,144-token slots; the E4B past 4 slots never ran on Vulkan either.
