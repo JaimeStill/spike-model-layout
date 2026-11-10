@@ -321,6 +321,10 @@ Door          two-way: the pull request reverts by commit, and its
 - role-split (BUILD, escalation 2): agent-vllm widens to the vision, audio and embedding models on vLLM, each in its own process, alone and together on the capability GB10, as a pending roadmap edit decided in its plan round (the architect).
 - role-split (BUILD, escalation 2): several llama.cpp vision processes in place of more slots is not pursued: more processes add load on the shared GPU's compute and bandwidth. The open question is the best inference path for vision and audio, likely each in its own vLLM process, embeddings too (the architect).
 - role-split (BUILD, escalation 3): the split's cells and D1/D2 ran from the laptop over Tailscale relays (gb10-1 DERP(nyc) 56 ms, gb10-2 DERP(iad) 61-112 ms at 10:23 local), slice 1 direct on the LAN (1-2 ms); no rerun on the LAN: the architect judges network latency not the bottleneck. The finding records each arm's path and that audio's 0.4-0.6 s pre-router time coincides with the relay runs, without deciding the cause (the architect).
+- role-split (BUILD, review escalation): the finding's figures are redone with jq and awk, quoted in the finding, in place of the session's untracked Python (STANDARDS.md, "No Python is authored") (the architect).
+- role-split (BUILD, review escalation): "every command ... exactly as run" covers the commands behind each figure and every command that changes a host; exploratory reads stay out, as footprint's practice left filters and loop lines in the step log (the architect).
+- role-split (BUILD, review escalation): S-knee ran each purpose's held level (agent 4, vision 1, audio 1, embedding 16), not GuideLLM's knee (vision 11.56); accepted as meeting the brief, since the held level is what Behavior 5 defines the split as holding (the architect).
+- role-split (BUILD, review escalation): the audio gap was timed by curl, one 6 s clip (192 KB WAV) to gb10-2's 16-slot E4B: from gb10-1 (direct, 2 ms) 0.38-0.42 s; from the laptop (DERP(iad), 61 ms) 0.77-0.92 s, the first 1.19 s. The 0.4 s difference is the request's trip over the relay, not inference.
 
 ## Pending edits
 
