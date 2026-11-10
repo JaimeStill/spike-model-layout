@@ -222,7 +222,7 @@ Door          two-way: the clone move and router restart revert by
 
 ## Progress
 
-slices 1/4 committed · standards — · spec — · editor —
+slices 2/4 committed · standards — · spec — · editor —
 
 ## Decisions
 
@@ -350,6 +350,7 @@ slices 1/4 committed · standards — · spec — · editor —
 - framework (BUILD): `watch` refuses to start a cell on an amdgpu host when `MEASURE_SYSTEM_FLOOR_GIB` is unset, so no Framework cell runs with system memory unwatched; the new sample column goes last, so older watch files still summarize; `footprint` reads both pools too.
 - framework (BUILD): the Framework's store extras were removed with `hf cache rm` (32,450,885,380 bytes), as gb10-1's were; its first `mise exec -- hf` installed the engines suite's huggingface_hub 2.4.0 at user level.
 - framework (BUILD): slice 1 ran direct on the LAN (0-2 ms) on every host, not over a relay.
+- framework (BUILD): slice 2 ran direct on the LAN too and made no tracked change (role-split's bench files unchanged); the Framework's after-cell read takes no page-cache drop, since it has no drop-caches sudoers rule, and stops the arm under either floor.
 
 ## Pending edits
 
