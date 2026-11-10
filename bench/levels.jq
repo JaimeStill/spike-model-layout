@@ -5,12 +5,13 @@
 #
 # A purpose prints the knee GuideLLM concluded, then one row a level: streams, requests ok /
 # errored / incomplete, output tok/s, requests/s, TTFT median, ITL median and p95 (GuideLLM's
-# own), request latency median and p90, prompt tok/s, RTFx median and min and the count at RTFx
-# >=5, the level's duration, and its floor verdict. Latency and RTFx are computed here from each
-# successful request: latency is request_end_time - request_start_time, RTFx is
-# input_metrics.audio_seconds over that latency. The floors: agent ITL median <=100 ms, vision
-# latency median <=10 s, audio RTFx median >=5, embed mean prompt tok/s >=4300; a level with no
-# successful request misses.
+# own), request latency median, p90 and min, for vision the count at latency <=10 s, prompt tok/s,
+# RTFx median and min and the count at RTFx >=5, the level's duration, and its floor verdict. The
+# two counts are "met/successful", the per-request reading of the floor beside its median verdict.
+# Latency and RTFx are computed here from each successful request: latency is request_end_time -
+# request_start_time, RTFx is input_metrics.audio_seconds over that latency. The floors: agent ITL
+# median <=100 ms, vision latency median <=10 s, audio RTFx median >=5, embed mean prompt tok/s
+# >=4300; a level with no successful request misses.
 #
 # `client` prints GuideLLM's own per-request timings for one level (index `level`, default 0),
 # successful requests in order of request_start: the gap from the previous request's end to this
@@ -70,6 +71,9 @@ def level($purpose):
       ($itl.percentiles.p95 | fixed(2)),
       ($latm | fixed(2)),
       ($lat | pct(0.9) | fixed(2)),
+      (if ($lat | length) > 0 then $lat | min | fixed(2) else "-" end),
+      (if $purpose == "vision"
+       then "\([$lat[] | select(. <= 10)] | length)/\($lat | length)" else "-" end),
       ($ptps | fixed(0)),
       (if ($rtfx | length) > 0
        then "\($rtfx | median | fixed(2)) | \($rtfx | min | fixed(2)) | \([$rtfx[] | select(. >= 5)] | length)/\($rtfx | length)"
@@ -81,7 +85,7 @@ def level($purpose):
 def table($purpose):
   "## \(name)",
   knee,
-  "streams | ok/err/inc | out tok/s | req/s | TTFT med ms | ITL med ms | ITL p95 ms | lat med s | lat p90 s | prompt tok/s | RTFx med | RTFx min | RTFx>=5 | dur s | floor",
+  "streams | ok/err/inc | out tok/s | req/s | TTFT med ms | ITL med ms | ITL p95 ms | lat med s | lat p90 s | lat min s | lat<=10s | prompt tok/s | RTFx med | RTFx min | RTFx>=5 | dur s | floor",
   (.benchmarks[] | level($purpose));
 
 def spread: if length == 0 then "none"
