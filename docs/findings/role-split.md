@@ -65,7 +65,18 @@ The sections loaded, with their arguments as `load` printed them from the router
 
 The preset key `ctx-checkpoints = 2` reaches the server as `--swa-checkpoints 2`, as `load` printed
 it. The Gemma sections' vision keys (`ub`, `image-min-tokens`, `mtmd-batch-max-tokens`) are not in
-`load`'s filter, so they aren't printed; the 16-slot 26B-A4B section carries them in 2d7ae32.
+`load`'s filter, so they aren't printed. The router's `/models` gives each section's full arguments;
+read from the laptop at 2026-11-10T16:43:48Z, after the split arm, both 26B-A4B sections carry them
+(the 16-slot one loaded, set A's unloaded; the argument lists are the router's, as printed):
+
+```
+date -u +%FT%TZ; curl -s http://gb10-2:8080/models | jq -r '.data[] | select(.id|test("26B-A4B")) | "\(.id) [\(.status.value)]: \(.status.args // [] | join(" "))"'
+```
+
+```
+gemma-4-26B-A4B-it-qat-Q4_0-16-slots [loaded]: /app/llama-server --no-cache-idle-slots --host 127.0.0.1 --image-min-tokens 560 --log-colors off --metrics --min-p 0 --mtmd-batch-max-tokens 512 --offline --port 38929 --temperature 1 --top-k 64 --top-p 0.95 --alias gemma-4-26B-A4B-it-qat-Q4_0-16-slots --ctx-size 131072 --cache-ram 0 --swa-checkpoints 2 --hf-repo google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0 --log-verbosity 4 --n-gpu-layers all --parallel 16 --ubatch-size 1120
+google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0 [unloaded]: /app/llama-server --no-cache-idle-slots --host 127.0.0.1 --image-min-tokens 560 --log-colors off --metrics --min-p 0 --mtmd-batch-max-tokens 512 --offline --port 48387 --temperature 1 --top-k 64 --top-p 0.95 --alias google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0 --ctx-size 32768 --cache-ram 0 --swa-checkpoints 2 --hf-repo google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0 --log-verbosity 4 --n-gpu-layers all --parallel 4 --ubatch-size 1120
+```
 
 **Tools.** The step helpers in `scripts/measure-lib.sh`, as the footprint finding used them
 (`load`, `unload`, `loaded`, `memory`, `footprint`, `cell`, `watch`, `readout`). Every cell is

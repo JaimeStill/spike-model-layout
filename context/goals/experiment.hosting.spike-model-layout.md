@@ -326,6 +326,7 @@ Door          two-way: the pull request reverts by commit, and its
 - role-split (BUILD, review escalation): S-knee ran each purpose's held level (agent 4, vision 1, audio 1, embedding 16), not GuideLLM's knee (vision 11.56); accepted as meeting the brief, since the held level is what Behavior 5 defines the split as holding (the architect).
 - role-split (BUILD, review escalation): the audio gap was timed by curl, one 6 s clip (192 KB WAV) to gb10-2's 16-slot E4B: from gb10-1 (direct, 2 ms) 0.38-0.42 s; from the laptop (DERP(iad), 61 ms) 0.77-0.92 s, the first 1.19 s. The 0.4 s difference is the request's trip over the relay, not inference.
 - role-split (BUILD): production clients sit on the same direct network as the GPUs in the datacenter, so the layout is sized on LAN figures; the relay cost measured in L.7 is recorded as a fact of off-network use, not a requirement for spike-model-gateway or something the layout optimizes (the architect).
+- role-split (BUILD): the jq and awk programs behind the finding's figures are tracked under bench/ (`levels.jq`, `srvtimes.awk`, `stats.awk`) and called with `-f` from the quoted commands; they are analysis files over the pinned tools, not a new tool.
 
 ## Pending edits
 
