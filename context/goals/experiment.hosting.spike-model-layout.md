@@ -220,6 +220,10 @@ Door          two-way: the clone move and router restart revert by
 ```
 
 
+## Progress
+
+slices 1/4 committed · standards — · spec — · editor —
+
 ## Decisions
 
 - setup: kind context; check `mise run check`, currency `mise run currency`, no gate; public GitHub with `gh pr create` and `gh pr merge --merge --delete-branch`, no CI — copied from spike-hosting-upgrades.
@@ -342,6 +346,10 @@ Door          two-way: the clone move and router restart revert by
 - framework: the session ends with the split plus the Framework serving (gb10-1 agent-only; gb10-2 its 16-slot sections and granite; the Framework its three capped capability sections); all three clones on main at 21b5e8c.
 - framework: when agent-vllm runs, the Framework runs gb10-2's capability workload and configuration on vLLM as well; a pending roadmap edit, not this task's work (the architect).
 - framework: the walkthrough reloads the Framework's capability sections from the finding's commands, reads both pools, and reruns one level of the sweep for the purpose it holds least of, as its own cell.
+- framework (BUILD): each GB10's 3 listed updates (distro-info, python3-distro-info, snapd 2.78) are Ubuntu-phased (10%), so `apt upgrade` holds them back; the architect's run upgraded 15 packages, and the phased three count as no pending updates; recorded in `.state/framework/phased-2026-11-10.txt`.
+- framework (BUILD): `watch` refuses to start a cell on an amdgpu host when `MEASURE_SYSTEM_FLOOR_GIB` is unset, so no Framework cell runs with system memory unwatched; the new sample column goes last, so older watch files still summarize; `footprint` reads both pools too.
+- framework (BUILD): the Framework's store extras were removed with `hf cache rm` (32,450,885,380 bytes), as gb10-1's were; its first `mise exec -- hf` installed the engines suite's huggingface_hub 2.4.0 at user level.
+- framework (BUILD): slice 1 ran direct on the LAN (0-2 ms) on every host, not over a relay.
 
 ## Pending edits
 
