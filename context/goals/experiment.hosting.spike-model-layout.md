@@ -219,6 +219,7 @@ Door          two-way: the pull request reverts by commit, and its
 - Escalation answered.
 - Slice 2 done (no tracked change): the split loaded (gb10-1 agent-only 1.39 GiB above its floor idle, 0.27 GiB under load; gb10-2 77.40 GiB available), S-agent/S-vision/S-audio, S-mixed and S-knee all completed above the floor; hosts end as Behavior 12 states. Next: slice 3, the finding and docs.
 - Slice 3 done: 89f31bc (finding, layout, README links) and dce714c (vision encode evidence). Next: the audio diagnostic pair (escalation 2), then reviews and the walkthrough.
+- D1/D2 done: 187fde7 (slot count doesn't explain the audio slowdown; the gap is before the router). Escalation 3 answered: no LAN rerun. Next: the network-path note in the finding, then reviews.
 
 ## Decisions
 
@@ -319,6 +320,7 @@ Door          two-way: the pull request reverts by commit, and its
 - role-split (BUILD, escalation 2): the split's single-stream audio slowdown is diagnosed in this task by a back-to-back pair on gb10-2 (set A's 4-slot E4B alone, then the 16-slot E4B alone, 1 stream, 60 s each, fresh loads), then gb10-2 returns to Behavior 12's state; the finding gains the pair (the architect).
 - role-split (BUILD, escalation 2): agent-vllm widens to the vision, audio and embedding models on vLLM, each in its own process, alone and together on the capability GB10, as a pending roadmap edit decided in its plan round (the architect).
 - role-split (BUILD, escalation 2): several llama.cpp vision processes in place of more slots is not pursued: more processes add load on the shared GPU's compute and bandwidth. The open question is the best inference path for vision and audio, likely each in its own vLLM process, embeddings too (the architect).
+- role-split (BUILD, escalation 3): the split's cells and D1/D2 ran from the laptop over Tailscale relays (gb10-1 DERP(nyc) 56 ms, gb10-2 DERP(iad) 61-112 ms at 10:23 local), slice 1 direct on the LAN (1-2 ms); no rerun on the LAN: the architect judges network latency not the bottleneck. The finding records each arm's path and that audio's 0.4-0.6 s pre-router time coincides with the relay runs, without deciding the cause (the architect).
 
 ## Pending edits
 
