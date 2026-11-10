@@ -213,6 +213,11 @@ Door          two-way: the pull request reverts by commit, and its
 ```
 
 
+## Progress
+
+- Slice 1 done (no tracked change beyond 5842e6d): stack read; role-split pushed to both GB10s as hosts-next, clones on `hosts`, routers restarted; anchors A and B on both (B missed once at 2.71% on one errored request, repeat within noise: parity holds); full-set arm on gb10-2, every cell completed above the floor. Raw output in `.state/measure/gb10-{1,2}/2026-11-10.log` and `.state/role-split/`. gb10-2 serves capped set A, gb10-1 nothing loaded.
+- Open: escalation on granite's uncapped idle-slot saves and F-L2's 31 of 32 (one Gemma 4 parser error). Next: slice 2, the split.
+
 ## Decisions
 
 - setup: kind context; check `mise run check`, currency `mise run currency`, no gate; public GitHub with `gh pr create` and `gh pr merge --merge --delete-branch`, no CI — copied from spike-hosting-upgrades.
