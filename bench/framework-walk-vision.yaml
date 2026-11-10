@@ -1,0 +1,27 @@
+# Framework slice 4, the architect's walkthrough: one X-vision level rerun as its own cell. The
+# Framework's capped 26B-A4B, google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0 (set A's section, 4
+# slots of 8,192 tokens), beside its E4B and granite loaded and idle, at 1 stream for 60 s:
+# X-vision's level 1 (role-split-vision-full.yaml), the level the Framework holds. Each request is
+# that file's image question: one synthetic 1440p JPEG beside 200 synthetic text tokens, exactly
+# 100 output tokens. Read against the framework finding's F.1 row at 1 stream, with both of the
+# Framework's floors watched. Engine-neutral: the section and its tokenizer
+# (google/gemma-4-26B-A4B-it) are given on the command line, as `cell`'s <section> <tokenizer>. Run
+# from the repository root:
+# `cell framework-walk-x-vision-1 framework-walk-vision google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0 google/gemma-4-26B-A4B-it`.
+spec:
+  backend:
+    kind: openai_http
+    request_format: /v1/chat/completions
+  profile:
+    kind: concurrent
+    streams: 1
+  data:
+    - kind: synthetic_text
+      prompt_tokens: 200
+    - kind: synthetic_image
+      resolution: 1440p
+      format: jpeg
+      output_tokens: 100
+  constraints:
+    - kind: max_duration
+      seconds: 60
