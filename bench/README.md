@@ -79,3 +79,20 @@ watch role-split-f-probe curl -sS -o "$MEASURE_STATE/role-split-f-probe.response
 
 The finding quotes the saved body: its usage (input tokens, against 15,028) and the time, or its
 error as returned.
+
+## Reading the results: `levels.jq`
+
+[`levels.jq`](levels.jq) turns GuideLLM's result JSON into the findings' per-level tables, one
+table a file, from the repository root:
+
+```sh
+jq -r --arg purpose agent -f bench/levels.jq .state/measure/gb10-2/role-split-f-agent.json
+```
+
+`purpose` is `agent`, `vision`, `audio` or `embed`, and sets the floor each level is judged by:
+ITL median ≤100 ms, request latency median ≤10 s, RTFx median ≥5 (each request's clip seconds over
+its request time), or mean prompt tok/s ≥4,300; a level with no successful request misses. Each
+table starts with the knee GuideLLM concluded, when the profile reports one. `--arg purpose client`
+prints instead GuideLLM's own per-request timings for one level (`--argjson level <i>`, default
+the first): the gap between requests, request start to first streamed chunk, streaming, and audio
+bytes. Medians and percentiles interpolate linearly between the two nearest ranks.

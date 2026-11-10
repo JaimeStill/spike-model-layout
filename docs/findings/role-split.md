@@ -11,8 +11,9 @@ capacity rows it measured beside the [footprint finding](footprint.md)'s table (
 closes three of footprint's six open items, two of them in part (section K.4). On the way it found that the capped Gemma
 sections still grow their RSS under load, that vision answers about 0.23 requests a second however
 many streams send them, in both arrangements, because the server encodes one image at a time
-(L.1), that the split's slower single-stream audio is not the 16-slot section's (L.7), and that
-the agent-only GB10 sits 1.39 GiB above its floor idle. It decides nothing.
+(L.1), that the split's slower single-stream audio is not the 16-slot section's but each
+request's trip from the laptop over a Tailscale relay, about 0.4 s a request (L.7), and that the
+agent-only GB10 sits 1.39 GiB above its floor idle. It decides nothing.
 
 | Host | Serves at the end of the session |
 | --- | --- |
@@ -78,8 +79,9 @@ command inside them (section M).
 
 **Per-level figures.** The step log holds each cell's summary line per level (requests, output
 tok/s, TTFT and ITL medians). Request latency, the vision and audio floors, and the knee estimate
-come from each cell's JSON through the session's per-level script, `levels.py` (untracked; its
-command is under "Commands not in a step log"). It judges agent by ITL median ≤100 ms, vision by
+come from each cell's JSON through the jq program [`bench/levels.jq`](../../bench/levels.jq)
+(its commands are under "Commands not in a step log"). Medians and percentiles interpolate
+linearly between the two nearest ranks. It judges agent by ITL median ≤100 ms, vision by
 the median request latency ≤10 s, audio by the median of each request's RTFx (its clip's seconds
 over its request time) ≥5, and embedding by mean prompt tok/s ≥4,300; a level with no successful
 request misses.
@@ -293,7 +295,8 @@ S-audio, gb10-2, the 16-slot E4B (c 131072, 16 slots of 8192), levels [1, 4, 8, 
 
 **Holds 1 request.** At 1 stream the split's E4B ran slower than the full set's: RTFx median 6.12
 against 11.11, TTFT 675 against 161 ms, 22 requests in 30 s against 49, with ITL alike (22.17
-against 21.65 ms). Section L.6; the pair in L.7 finds slot count doesn't explain it.
+against 21.65 ms). Section L.6; L.7 finds slot count doesn't explain it and the network path
+from the laptop does.
 
 ### D.4 Embedding
 
@@ -667,8 +670,8 @@ S-agent 2 (12 streams). Anchor B's one is what put its first run outside parity 
 ### L.6 Speed the arms don't explain
 
 - **Audio, single stream.** The split's 16-slot E4B ran at RTFx 6.12 alone against the full set's
-  4-slot E4B at 11.11, its TTFT 675 against 161 ms, with ITL alike (D.3). The pair in L.7 tests
-  slot count alone: it doesn't explain it.
+  4-slot E4B at 11.11, its TTFT 675 against 161 ms, with ITL alike (D.3). L.7 explains it: not
+  the slot count but each request's trip from the laptop over a Tailscale relay.
 - **Agent at 8 sessions.** S-agent's 8 sessions missed at ITL 109.63 ms and TTFT 25,279 ms, where
   F-agent's 8 met at 68.66 ms and 18,137 ms. set-a has 4 slots, so F-agent's 8 streams exceed its
   slots; the agent-only section serves 16. At 4 sessions the two were within 3.5 ms (c) of ITL apart
@@ -677,7 +680,7 @@ S-agent 2 (12 streams). Anchor B's one is what put its first run outside parity 
   4.32 s alone, and 1 audio stream ran at RTFx 2.26 against 6.12 alone, with granite at 16 streams
   beside them (F). No cell ran them in pairs.
 
-### L.7 Single-stream audio, D1 and D2: slot count doesn't explain the split's slowdown
+### L.7 Single-stream audio: not the slot count, the request's trip over the relay
 
 **Decision it informs:** whether the split's single-stream audio slowdown (S-audio level 1 against
 F-audio level 1, D.3) comes from the 16-slot section. By the architect's escalation answer, a
@@ -709,8 +712,8 @@ helper's filter printed):
 Neither the ubatch nor the batch size is passed by either section, and the compute buffers, sized
 by them, are equal. Both processes' figures match the F and S arms' (G, K.2).
 
-**The client's figures** (each run's JSON, `levels.py`; the first 30 s counts the requests that
-ended by 30 s into the level):
+**The client's figures** (each run's JSON, `bench/levels.jq`; the first 30 s counts the requests
+that ended by 30 s into the level):
 
 | Run | Section, residents | Ok / errored / incomplete | Output tok/s | TTFT median | ITL median | Latency median / p90 | RTFx median / min | RTFx ≥5 | First 30 s: ok, RTFx median / min |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -740,7 +743,8 @@ Inside the server the four runs are alike: one audio encode of 10 to 116 ms a re
 and eval within their clips' token counts (S-audio's 20 requests are the clips' first 20, longer on
 the median), the same ms a token, one slot used at a time with 4 or 16 configured. **What differs is
 between requests:** in F-audio the next request reached the router 14 ms after the last one's
-release; in S-audio, D1 and D2, 404 to 598 ms. GuideLLM's own timings place part of it on the
+release; in S-audio, D1 and D2, 404 to 598 ms. GuideLLM's own timings (each run's JSON,
+`bench/levels.jq`'s `client`) place part of it on the
 laptop: from one request's end to the next's start, 6 ms in F-audio, 61 to 68 ms in the other three;
 from a request's start to its first streamed chunk, 161 ms in F-audio, 495 to 696 ms in the others.
 Subtracting the server's proxy-to-slot and prompt-eval medians from that, about 8 ms of F-audio's
@@ -748,17 +752,35 @@ time to first chunk falls outside the server, 339 ms of D1's, 359 ms of D2's and
 S-audio's (c, from medians: 161 − 10.1 − 142.5; 495 − 11.5 − 144.5; 515 − 10.5 − 145.3; 696 − 17.4
 − 158.7). That time is spent before the router logs its proxy line: on the laptop, on the network,
 or in the router receiving the request (a median of 168 to 207 KB of WAV in its JSON). These reads
-don't separate the three.
+don't separate the three. Slot count doesn't explain the slowdown, and D1 rules out the residents
+and the page cache as needed for it: it was slow with no other section loaded and the cache
+dropped. F-audio ran with the laptop direct on the LAN; S-audio, D1 and D2 over Tailscale relays
+(Stack).
 
-**What else differed between F-audio and S-audio.** Slot count doesn't explain the slowdown, and
-D1 rules out the residents and the page cache as needed for it: it was slow with no other section
-loaded and the cache dropped. What did differ, none of it measured apart: F-audio ran at
-12:13Z, the session's earlier part, after F-agent and F-vision; S-audio at 14:30Z, after S-vision,
-with the 16-slot 26B-A4B co-resident and recently busy and granite loaded; D1 and D2 at 15:15Z
-after a drop. The laptop running GuideLLM, the network path from it (direct on the LAN for F-audio;
-over Tailscale relays, 56-112 ms, when read after D1 and D2, Stack, so for S-audio, D1 and D2), and the router process (pid 1622373 in every `footprint`
-read of the session, its container started 11:34:10Z, its log grown by every cell) are the parts the slow runs share and these reads don't measure.
-Nothing here decides the cause.
+**The network's cost, timed by curl (16:29Z).** One request sent from two places to the same
+section, gb10-2's 16-slot E4B (`gemma-4-E4B-it-Q8_0-16-slots`): a 6 s
+clip cut from the probe's WAV (60 s in, 16 kHz mono, 192,078 bytes), posted to
+`/v1/audio/transcriptions` with curl, which reports when the connection opened, when the upload
+began, when the first byte of the reply came back, and the total. From gb10-1, `tailscale ping`
+found a direct path to gb10-2 at 2 ms; from the laptop, via DERP(iad) in 61 ms, "direct connection
+not established". Every request returned 200 with 192,421 bytes (laptop) or 192,424 (gb10-1) sent.
+Commands in section M; outputs in `.state/role-split/curl-timing-raw.txt`,
+`curl-timing-gb10-1.txt` and `curl-timing-laptop.txt`.
+
+| From | Path to gb10-2 | Requests | Connect | First byte | Total |
+| --- | --- | --- | --- | --- | --- |
+| gb10-1 (16:29:28Z) | direct, 2 ms | 5 | 2.1 to 2.9 ms | 0.377 to 0.423 s | **0.377 to 0.423 s** |
+| laptop (16:29:35Z) | DERP(iad), 61 ms | 5 | 56.7 to 59.4 ms | 0.772 to 0.922 s | **0.772 to 0.922 s** |
+| laptop, one request alone (16:29:16Z) | relay | 1 | 122.8 ms | 1.188 s | **1.188 s** |
+
+The same request took about 0.4 s longer from the laptop (c: medians 0.800 against 0.401 s). The
+server's work is the same in both, so **the ~0.4 s is the request's trip over the relay**, and it
+matches the 0.4 to 0.6 s a request that S-audio, D1 and D2 spent before the router's proxy line,
+where F-audio, from the LAN, spent 14 ms. That is the split's single-stream audio slowdown: the
+laptop's network path when it ran, not the arrangement. The cost lands on each request's latency,
+not on the host's throughput: the server sat idle between requests while it crossed. Not
+measured: that the cost grows with the payload and the round trip, so a larger audio window or an
+image pays more (N).
 
 **gb10-2 restored.** `unload --all`, cache dropped (117.51 GiB available), the 16-slot 26B-A4B
 (13.1 s), the 16-slot E4B (9.9 s) and granite (3.5 s) loaded, 15:18:55-15:19:22Z, idle 30 s, cache
@@ -792,15 +814,20 @@ Their buffers, as `footprint` printed them, are G's.
 | D1 | gb10-2 | `bench/role-split-diag-audio.yaml`, set A's 4-slot E4B loaded fresh and alone after `unload --all` and a cache drop, 30 s idle | 1 stream, LibriSpeech clips as F-audio | 60 s | whether slot count explains the split's single-stream audio (L.7) |
 | D2 | gb10-2 | as D1, the 16-slot E4B | as D1 | 60 s | as D1 (L.7) |
 | Restore | gb10-2 | the split's three sections after `unload --all` and a cache drop; 30 s idle | none | 27 s (load to last) | gb10-2 back to Behavior 12's state (L.7) |
+| Network cost | laptop and gb10-1, to gb10-2 | curl, `/v1/audio/transcriptions`, the 16-slot E4B | one 6 s clip (192,078 bytes), 5 requests from each, one by one, and one lone request from the laptop | 0.4 to 1.2 s a request | what the laptop's relay path adds to a request (L.7) |
 
 Every cell ran under `watch`, memory sampled every 10 s, capped at 10 min, the floor
 `MEASURE_FLOOR_GIB` 12.2 on both GB10s.
 
 ### Commands as run (gb10-1)
 
-From `.state/measure/gb10-1/2026-11-10.log`, every command at the step level, in log order. As in
-the footprint finding, every line inside a helper and the log's header lines stay in the log, and
-the `export MEASURE_FLOOR_GIB=12.2` each step began with is left out. `<scratchpad>` stands for the
+From `.state/measure/gb10-1/2026-11-10.log`, every command at the step level that a figure rests
+on or that changed the host, in log order. As in the footprint finding, every line inside a helper
+and the log's header lines stay in the log, and the `export MEASURE_FLOOR_GIB=12.2` each step
+began with is left out. So are the reads no figure rests on, by the architect's decision (goal
+record): the `loaded` reads that end a step (except each host's last, its state at the end of the
+session) or come just before an `unload --all`, and the `memory` reads just before a cell. A step's
+opening `loaded`, which shows what was resident when it began, stays. `<scratchpad>` stands for the
 session's scratch directory,
 `/tmp/claude-1000/-home-jaime-experiments-spike-model-layout/1077e790-19b7-4c69-bebf-53d1c193a7e3/scratchpad`;
 the `source` lines are the step files, and the commands traced after each are what they ran.
@@ -816,17 +843,14 @@ pool reads under 12,492 MiB (the step file's text; the log traces its commands i
 06:36:24  load gpt-oss-120b-MXFP4-set-a
 06:37:09  cell role-split-anchor-gb10-1-b anchor-b gpt-oss-120b-MXFP4-set-a openai/gpt-oss-120b
 06:39:12  unload gpt-oss-120b-MXFP4-set-a
-06:39:15  loaded
 06:44:23  source <scratchpad>/b2-gb10-1.sh
 06:44:23  : 'anchor B missed parity (gb10-1 78.58 with 1 errored vs gb10-2 80.71 tok/s, 2.71% over 2.2%): repeated once on both hosts'
 06:44:23  loaded
 06:44:23  load gpt-oss-120b-MXFP4-set-a
 06:45:11  cell role-split-anchor-gb10-1-b-r2 anchor-b gpt-oss-120b-MXFP4-set-a openai/gpt-oss-120b
 06:47:14  unload gpt-oss-120b-MXFP4-set-a
-06:47:17  loaded
 09:10:18  source <scratchpad>/s1-gb10-1.sh
 09:10:18  : 'role-split split arm on gb10-1: drop the page cache, load the agent-only section alone'
-09:10:18  loaded
 09:10:18  unload --all
 09:10:18  ssh gb10-1 sudo -n /usr/sbin/sysctl vm.drop_caches=3
 09:10:19  memory
@@ -838,15 +862,12 @@ pool reads under 12,492 MiB (the step file's text; the log traces its commands i
 09:11:41  ssh gb10-1 sudo -n /usr/sbin/sysctl vm.drop_caches=3
 09:11:42  memory
 09:11:43  footprint 2026-11-10T14:10:20Z
-09:11:44  loaded
 09:12:16  source <scratchpad>/s2-gb10-1.sh
 09:12:16  : 'S-agent: gpt-oss-120b agent-only alone on gb10-1, knee [1,4,8,12,16], 110 s a level'
 09:12:16  source <scratchpad>/after.sh
 09:12:16  loaded
-09:12:16  memory
 09:12:17  cell role-split-s-agent role-split-agent-split gpt-oss-120b-MXFP4-agent-only openai/gpt-oss-120b
 09:22:15  after s-agent
-09:22:18  loaded
 09:34:23  source <scratchpad>/mixed-gb10-1.sh
 09:34:23  : 'role-split-s-mixed: the split'\''s agent process on gb10-1, 4 sessions, 240 s, started with gb10-2'\''s three'
 09:34:23  source <scratchpad>/after.sh
@@ -854,7 +875,6 @@ pool reads under 12,492 MiB (the step file's text; the log traces its commands i
 09:34:23  GUIDELLM__SPEC__PROFILE__STREAMS=4
 09:34:23  cell role-split-s-mixed-agent role-split-mixed-agent gpt-oss-120b-MXFP4-agent-only openai/gpt-oss-120b
 09:38:46  after s-mixed-agent
-09:38:50  loaded
 09:40:23  source <scratchpad>/mixed-gb10-1.sh
 09:40:23  : 'role-split-s-knee: the split'\''s agent process on gb10-1, 4 sessions, 240 s, started with gb10-2'\''s three'
 09:40:23  source <scratchpad>/after.sh
@@ -885,17 +905,14 @@ pass of its loop; it is shown once, before the loop's first `load`.
 06:41:15  load gpt-oss-120b-MXFP4-set-a
 06:42:03  cell role-split-anchor-gb10-2-b anchor-b gpt-oss-120b-MXFP4-set-a openai/gpt-oss-120b
 06:44:05  unload gpt-oss-120b-MXFP4-set-a
-06:44:08  loaded
 06:47:17  source <scratchpad>/b2-gb10-2.sh
 06:47:17  : 'anchor B missed parity (gb10-1 78.58 with 1 errored vs gb10-2 80.71 tok/s, 2.71% over 2.2%): repeated once on both hosts'
 06:47:17  loaded
 06:47:17  load gpt-oss-120b-MXFP4-set-a
 06:48:02  cell role-split-anchor-gb10-2-b-r2 anchor-b gpt-oss-120b-MXFP4-set-a openai/gpt-oss-120b
 06:50:04  unload gpt-oss-120b-MXFP4-set-a
-06:50:07  loaded
 06:51:01  source <scratchpad>/f1.sh
 06:51:01  : 'role-split full-set arm on gb10-2: unload all, drop the page cache, load capped set A'
-06:51:01  loaded
 06:51:01  unload --all
 06:51:01  ssh gb10-2 sudo -n /usr/sbin/sysctl vm.drop_caches=3
 06:51:02  memory
@@ -928,11 +945,9 @@ pass of its loop; it is shown once, before the loop's first `load`.
 07:19:20  watch role-split-f-probe curl -sS -o /home/jaime/experiments/spike-model-layout/.state/measure/gb10-2/role-split-f-probe.response.json -w '%{http_code} %{time_total}s\n' http://gb10-2:8080/v1/audio/transcriptions -F model=ggml-org/gemma-4-E4B-it-GGUF:Q8_0 -F file=@.state/role-split/ami-es2002a-first10min.wav
 07:19:31  cat /home/jaime/experiments/spike-model-layout/.state/measure/gb10-2/role-split-f-probe.log
 07:19:31  after f-probe
-07:19:33  loaded
 07:21:41  source <scratchpad>/f3.sh
 07:21:41  : 'F-mixed: four cell processes started together at the load targets, agent 4, vision 4, audio 4, embedding 16, 240 s each'
 07:21:41  loaded
-07:21:41  memory
 07:21:41  GUIDELLM__SPEC__PROFILE__STREAMS=4
 07:21:41  wait
 07:21:41  GUIDELLM__SPEC__PROFILE__STREAMS=4
@@ -946,10 +961,8 @@ pass of its loop; it is shown once, before the loop's first `load`.
 07:26:07  memory
 07:26:07  date -u +%FT%TZ
 07:26:07  footprint 2026-11-10T12:26:07Z
-07:26:08  loaded
 09:10:18  source <scratchpad>/s1-gb10-2.sh
 09:10:18  : 'role-split split arm on gb10-2: unload all, drop the page cache, load the 16-slot 26B-A4B, the 16-slot E4B and granite'
-09:10:18  loaded
 09:10:18  unload --all
 09:10:32  ssh gb10-2 sudo -n /usr/sbin/sysctl vm.drop_caches=3
 09:10:33  memory
@@ -964,17 +977,14 @@ pass of its loop; it is shown once, before the loop's first `load`.
 09:11:31  ssh gb10-2 sudo -n /usr/sbin/sysctl vm.drop_caches=3
 09:11:33  memory
 09:11:33  footprint 2026-11-10T14:10:34Z
-09:11:35  loaded
 09:22:19  source <scratchpad>/s2-gb10-2.sh
 09:22:19  : 'S-vision and S-audio on gb10-2, knee [1,4,8,12,16]: vision 90 s a level, audio 30 s or 64 requests a level'
 09:22:19  source <scratchpad>/after.sh
 09:22:19  loaded
-09:22:19  memory
 09:22:20  cell role-split-s-vision role-split-vision-split gemma-4-26B-A4B-it-qat-Q4_0-16-slots google/gemma-4-26B-A4B-it
 09:30:44  after s-vision
 09:30:48  cell role-split-s-audio role-split-audio-split gemma-4-E4B-it-Q8_0-16-slots google/gemma-4-E4B-it
 09:33:30  after s-audio
-09:33:34  loaded
 09:34:23  source <scratchpad>/mixed-gb10-2.sh
 09:34:23  : 'role-split-s-mixed: the split'\''s vision 4, audio 4 and embedding 16 processes on gb10-2, 240 s each, started together with gb10-1'\''s agent'
 09:34:23  source <scratchpad>/after.sh
@@ -987,7 +997,6 @@ pass of its loop; it is shown once, before the loop's first `load`.
 09:34:23  cell role-split-s-mixed-embed role-split-mixed-embed mrutkows/granite-embedding-english-r2-GGUF:BF16 ibm-granite/granite-embedding-english-r2
 09:34:23  cell role-split-s-mixed-audio role-split-mixed-audio gemma-4-E4B-it-Q8_0-16-slots google/gemma-4-E4B-it
 09:39:52  after s-mixed
-09:39:57  loaded
 09:40:23  source <scratchpad>/mixed-gb10-2.sh
 09:40:23  : 'role-split-s-knee: the split'\''s vision 1, audio 1 and embedding 16 processes on gb10-2, 240 s each, started together with gb10-1'\''s agent'
 09:40:23  source <scratchpad>/after.sh
@@ -1000,11 +1009,9 @@ pass of its loop; it is shown once, before the loop's first `load`.
 09:40:24  cell role-split-s-knee-embed role-split-mixed-embed mrutkows/granite-embedding-english-r2-GGUF:BF16 ibm-granite/granite-embedding-english-r2
 09:40:24  cell role-split-s-knee-vision role-split-mixed-vision gemma-4-26B-A4B-it-qat-Q4_0-16-slots google/gemma-4-26B-A4B-it
 09:46:11  after s-knee
-09:46:15  loaded
 10:14:15  source <scratchpad>/d1.sh
 10:14:15  : 'role-split D1 on gb10-2: unload all, drop the page cache, load set A'\''s 4-slot E4B alone, 30 s idle, then E4B audio at 1 stream for 60 s'
 10:14:15  source <scratchpad>/after.sh
-10:14:15  loaded
 10:14:15  unload --all
 10:14:26  ssh gb10-2 sudo -n /usr/sbin/sysctl vm.drop_caches=3
 10:14:27  memory
@@ -1020,11 +1027,9 @@ pass of its loop; it is shown once, before the loop's first `load`.
 10:15:09  footprint 2026-11-10T15:14:27Z
 10:15:12  cell role-split-d1-audio role-split-diag-audio ggml-org/gemma-4-E4B-it-GGUF:Q8_0 google/gemma-4-E4B-it
 10:16:32  after d1-audio
-10:16:36  loaded
 10:16:37  source <scratchpad>/d2.sh
 10:16:37  : 'role-split D2 on gb10-2: unload all, drop the page cache, load the 16-slot E4B alone, 30 s idle, then E4B audio at 1 stream for 60 s'
 10:16:37  source <scratchpad>/after.sh
-10:16:37  loaded
 10:16:37  unload --all
 10:16:41  ssh gb10-2 sudo -n /usr/sbin/sysctl vm.drop_caches=3
 10:16:41  memory
@@ -1040,10 +1045,8 @@ pass of its loop; it is shown once, before the loop's first `load`.
 10:17:24  footprint 2026-11-10T15:16:42Z
 10:17:26  cell role-split-d2-audio role-split-diag-audio gemma-4-E4B-it-Q8_0-16-slots google/gemma-4-E4B-it
 10:18:45  after d2-audio
-10:18:50  loaded
 10:18:50  source <scratchpad>/restore.sh
 10:18:50  : 'role-split D1/D2 done, gb10-2 back to Behavior 12'\''s state: unload all, drop the page cache, load the 16-slot 26B-A4B, the 16-slot E4B and granite'
-10:18:50  loaded
 10:18:50  unload --all
 10:18:54  ssh gb10-2 sudo -n /usr/sbin/sysctl vm.drop_caches=3
 10:18:54  memory
@@ -1126,16 +1129,17 @@ tailscale ping -c 1 gb10-2; tailscale ping -c 1 gb10-1
 { date -Is; tailscale ping -c 1 gb10-1; tailscale ping -c 1 gb10-2; tailscale status --self --peers=false 2>/dev/null | head -2; } > .state/role-split/ping-$(date +%H%M).txt 2>&1; cat .state/role-split/ping-*.txt; grep -n "tailscale ping\|DERP\|via " .state/measure/gb10-2/2026-11-10.log | tail -5
 ```
 
-The per-level tables in D, F, I and J (14:48:28Z) and the errors in L.4 and L.5 (14:49:39Z) were
-read from the cells' JSON:
+The per-level tables in B, D, F, I, J and L.7 were read from the cells' JSON with
+[`bench/levels.jq`](../../bench/levels.jq) at 16:34:20Z, and the errors in L.4 and L.5 at 14:49:39Z.
+The four `--arg purpose` lines, L.7's `client` loop and L.1's awk read (below) ran as lines of one
+`{ ...; } > <scratchpad>/jq-figures.txt 2>&1` group, after a `date -u +%FT%TZ`; the errors line is
+the session's own:
 
 ```sh
-S=<scratchpad>; M=.state/measure;
-python3 -I $S/levels.py agent $M/gb10-2/role-split-f-agent.json $M/gb10-1/role-split-s-agent.json $M/gb10-2/role-split-f-mixed-agent.json $M/gb10-1/role-split-s-mixed-agent.json $M/gb10-1/role-split-s-knee-agent.json
-python3 -I $S/levels.py vision $M/gb10-2/role-split-f-l2.json $M/gb10-2/role-split-f-vision.json $M/gb10-2/role-split-s-vision.json $M/gb10-2/role-split-f-mixed-vision.json $M/gb10-2/role-split-s-mixed-vision.json $M/gb10-2/role-split-s-knee-vision.json
-python3 -I $S/levels.py audio $M/gb10-2/role-split-f-audio.json $M/gb10-2/role-split-s-audio.json $M/gb10-2/role-split-f-mixed-audio.json $M/gb10-2/role-split-s-mixed-audio.json $M/gb10-2/role-split-s-knee-audio.json
-python3 -I $S/levels.py embed $M/gb10-2/role-split-f-embed.json $M/gb10-2/role-split-f-mixed-embed.json $M/gb10-2/role-split-s-mixed-embed.json $M/gb10-2/role-split-s-knee-embed.json
-python3 -I $S/levels.py agent $M/gb10-*/role-split-anchor-*.json
+M=.state/measure; jq -r --arg purpose agent -f bench/levels.jq $M/gb10-2/role-split-f-agent.json $M/gb10-1/role-split-s-agent.json $M/gb10-2/role-split-f-mixed-agent.json $M/gb10-1/role-split-s-mixed-agent.json $M/gb10-1/role-split-s-knee-agent.json $M/gb10-*/role-split-anchor-*.json
+M=.state/measure; jq -r --arg purpose vision -f bench/levels.jq $M/gb10-2/role-split-f-l2.json $M/gb10-2/role-split-f-vision.json $M/gb10-2/role-split-s-vision.json $M/gb10-2/role-split-f-mixed-vision.json $M/gb10-2/role-split-s-mixed-vision.json $M/gb10-2/role-split-s-knee-vision.json
+M=.state/measure; jq -r --arg purpose audio -f bench/levels.jq $M/gb10-2/role-split-f-audio.json $M/gb10-2/role-split-s-audio.json $M/gb10-2/role-split-f-mixed-audio.json $M/gb10-2/role-split-s-mixed-audio.json $M/gb10-2/role-split-s-knee-audio.json $M/gb10-2/role-split-d1-audio.json $M/gb10-2/role-split-d2-audio.json
+M=.state/measure; jq -r --arg purpose embed -f bench/levels.jq $M/gb10-2/role-split-f-embed.json $M/gb10-2/role-split-f-mixed-embed.json $M/gb10-2/role-split-s-mixed-embed.json $M/gb10-2/role-split-s-knee-embed.json
 for f in .state/measure/gb10-*/role-split-*.json; do case $f in *probe*) continue;; esac; jq -r --arg f "${f##*/}" '.benchmarks[] | (.config.strategy.streams|tostring) as $s | .requests.errored[]? | "\($f) s=\($s): \(.info.error // .error // "?" | tostring | .[0:220])"' $f 2>/dev/null; done
 ```
 
@@ -1150,20 +1154,52 @@ cd /home/jaime/experiments/spike-model-layout && ssh -o BatchMode=yes gb10-2 'do
 S=<scratchpad>; ssh -o BatchMode=yes gb10-2 'docker logs llama 2>&1 | grep -E "^\[44615\]" | grep -E "audio decoded|CLIP using"' > $S/a44615.txt; echo rc=$?; wc -l < $S/a44615.txt; head -3 $S/a44615.txt; grep -o 'in [0-9]* ms' $S/a44615.txt | awk '{print $2}' | sort -n | awk '{a[NR]=$1} END{print "n",NR,"min",a[1],"median",a[int((NR+1)/2)],"p95",a[int(NR*0.95)],"max",a[NR]}'
 ```
 
-L.1's encode-to-decode gaps and `image decoded` times were computed from the vision extract by two
-inline Python scripts the session ran (14:59:20Z, 14:59:28Z), which are not quoted here.
+L.1's count of encodes, its encode-to-decode gaps (with a count of any encode that began before
+the one before it had decoded, which printed `overlaps 0`) and its `image decoded` times, from the
+vision extract, with awk (16:34:24Z); `med` prints the count, min, median (interpolated as
+`bench/levels.jq` does) and max of sorted numbers:
 
-Section L.7's per-request timings, from the project's root, at 15:20:41Z (read-only: `docker logs`
-on gb10-2), each window a run's 1-stream level from its JSON and each port the E4B child serving it
-(F-audio 52027, S-audio 44615, D1 34633, D2 52363). The scripts are the session's, copied beside
-their output into `.state/role-split/`, which starts with these commands and holds what they printed
-(`audio-diag-gb10-2-2026-11-10.txt`, each command before what it printed); the first 30 s column
-came from the JSON with `jq`:
+```sh
+med='{a[NR]=$1} END{k=(NR-1)*0.5; lo=int(k); hi=(lo+1<NR-1)?lo+1:NR-1; printf "n %d, min %s, median %.2f, max %s\n", NR, a[1], a[lo+1]+(a[hi+1]-a[lo+1])*(k-lo), a[NR]}'; V=.state/role-split/vision-encode-gb10-2-2026-11-10.log; grep -c 'encoding mtmd batch' $V; awk '/^\[/ {split($2,t,"."); s=t[1]*60+t[2]+t[3]/1000+t[4]/1e6} /encoding mtmd batch/ {if (open) overlaps++; open=1; e=s} /decoding image batch/ && open {printf "%.6f\n", s-e; open=0} END {print "overlaps " overlaps+0 > "/dev/stderr"}' $V | sort -n | awk "$med"; grep -o 'image decoded (batch 1/1) in [0-9]* ms' $V | awk '{print $(NF-1)}' | sort -n | awk "$med"
+```
+
+Section L.7's server timings, from the project's root, at 15:20:41Z (read-only: `docker logs` on
+gb10-2), each window a run's 1-stream level from its JSON and each port the E4B child serving it
+(F-audio 52027, S-audio 44615, D1 34633, D2 52363). `.state/role-split/audio-diag-gb10-2-2026-11-10.txt`
+holds each command before what it printed:
 
 ```sh
 ssh gb10-2 'docker logs --timestamps --since <start> --until <end> llama 2>&1' | python3 -I .state/role-split/srvtimes.py <port>
-python3 -I .state/role-split/client.py .state/measure/gb10-2/role-split-<cell>.json
-jq -r --arg c <cell> '.benchmarks[0] | .start_time as $t0 | [.requests.successful[] | select(.request_end_time - $t0 <= 30) | .input_metrics.audio_seconds / (.request_end_time - .request_start_time)] | sort | "\($c) first 30 s: \(length) ok, RTFx median \(if length%2==1 then .[(length-1)/2] else (.[length/2-1]+.[length/2])/2 end*100|round/100), min \(.[0]*100|round/100)"' .state/measure/gb10-2/role-split-<cell>.json
+```
+
+L.7's client timings (16:34:20Z, with the per-level tables) and its first 30 s column (16:36:01Z),
+from each run's JSON:
+
+```sh
+for c in f-audio s-audio d1-audio d2-audio; do jq -r --arg purpose client -f bench/levels.jq .state/measure/gb10-2/role-split-$c.json; done
+for c in f-audio s-audio d1-audio d2-audio; do jq -r --arg c $c '.benchmarks[0] | .start_time as $t0 | [.requests.successful[] | select(.request_end_time - $t0 <= 30) | .input_metrics.audio_seconds / (.request_end_time - .request_start_time)] | sort | "\($c) first 30 s: \(length) ok, RTFx median \(if length%2==1 then .[(length-1)/2] else (.[length/2-1]+.[length/2])/2 end*100|round/100), min \(.[0]*100|round/100)"' .state/measure/gb10-2/role-split-$c.json; done
+```
+
+L.7's network cost, from the project's root. The clip cut, gb10-1's path to gb10-2 and its health
+read, and the laptop's ping (16:29:05Z):
+
+```sh
+ffmpeg -loglevel error -y -ss 60 -t 6 -i .state/role-split/ami-es2002a-first10min.wav -ar 16000 -ac 1 .state/role-split/clip-6s.wav && ls -l .state/role-split/clip-6s.wav && ssh -o BatchMode=yes gb10-1 'tailscale ping -c 1 gb10-2; curl -s -o /dev/null -w "%{http_code}\n" http://gb10-2:8080/health'; tailscale ping -c 1 gb10-2
+```
+
+The first try (16:29:13Z): its `head -3` ended the pipe after the laptop's first request, so
+`curl-timing-raw.txt` holds that one request and nothing from the gb10-1 half:
+
+```sh
+W='%{http_code} connect %{time_connect} upload_done %{time_pretransfer} first_byte %{time_starttransfer} total %{time_total} up_bytes %{size_upload}\n'; { date -u +%FT%TZ; echo "== from laptop (relay)"; for i in 1 2 3 4 5; do curl -sS -o /dev/null -w "$W" http://gb10-2:8080/v1/audio/transcriptions -F model=gemma-4-E4B-it-Q8_0-16-slots -F file=@.state/role-split/clip-6s.wav; done; echo "== from gb10-1 (LAN)"; ssh -o BatchMode=yes gb10-1 "for i in 1 2 3 4 5; do curl -sS -o /dev/null -w '$W' http://gb10-2:8080/v1/audio/transcriptions -F model=gemma-4-E4B-it-Q8_0-16-slots -F 'file=@/dev/stdin;filename=clip-6s.wav' < /tmp/rs-clip.wav; done" ; } 2>&1 | tee .state/role-split/curl-timing-raw.txt | head -3
+```
+
+From gb10-1: the clip copied to it, five requests, the copy removed (16:29:25Z, timed from
+16:29:28Z); then from the laptop, five requests after a ping (16:29:35Z):
+
+```sh
+cat .state/role-split/curl-timing-raw.txt; W='%{http_code} connect %{time_connect} upload_done %{time_pretransfer} first_byte %{time_starttransfer} total %{time_total} up_bytes %{size_upload}\n'; ssh -o BatchMode=yes gb10-1 'cat > /tmp/rs-clip-6s.wav' < .state/role-split/clip-6s.wav && { date -u +%FT%TZ; echo "== from gb10-1 (direct to gb10-2, 2 ms)"; ssh -o BatchMode=yes gb10-1 "for i in 1 2 3 4 5; do curl -sS -o /dev/null -w '$W' http://gb10-2:8080/v1/audio/transcriptions -F model=gemma-4-E4B-it-Q8_0-16-slots -F file=@/tmp/rs-clip-6s.wav; done; rm -f /tmp/rs-clip-6s.wav"; } 2>&1 | tee .state/role-split/curl-timing-gb10-1.txt
+W='%{http_code} connect %{time_connect} upload_done %{time_pretransfer} first_byte %{time_starttransfer} total %{time_total} up_bytes %{size_upload}\n'; { date -u +%FT%TZ; tailscale ping -c 1 gb10-2; echo "== from laptop"; for i in 1 2 3 4 5; do curl -sS -o /dev/null -w "$W" http://gb10-2:8080/v1/audio/transcriptions -F model=gemma-4-E4B-it-Q8_0-16-slots -F file=@.state/role-split/clip-6s.wav; done; } 2>&1 | tee .state/role-split/curl-timing-laptop.txt
 ```
 
 ## N. Open items for later tasks
@@ -1188,10 +1224,13 @@ None of these is decided here.
   for 131,072-token sessions; the measured 4 is the ITL floor's count for the 4-turn shape, missed at
   8. Sessions of 131,072 tokens stay computed.
 - **Single-stream audio slower after F-audio** (RTFx 6.12 in S-audio against 11.11 in F-audio):
-  not the 16-slot section's. D1 and D2, each E4B section fresh and alone, matched each other (RTFx
-  6.43 and 6.53, TTFT 495 and 516 ms) and S-audio, with the server's own timings alike in all four
-  runs; the extra time falls between requests, before the router's proxy line, on the laptop, the
-  network or the router, which these reads don't separate (L.7). Its cause is open.
+  not the 16-slot section's but the network path. D1 and D2, each E4B section fresh and alone,
+  matched each other (RTFx 6.43 and 6.53, TTFT 495 and 516 ms) and S-audio, with the server's own
+  timings alike in all four runs; the extra 0.4 to 0.6 s a request fell before the router's proxy
+  line. Timed by curl, the same 6 s clip took 0.377 to 0.423 s from gb10-1 (direct, 2 ms) and 0.772
+  to 0.922 s from the laptop (DERP(iad), 61 ms): the ~0.4 s is the request's trip over the relay
+  (L.7). It lands on each request's latency, not on the host's throughput. The split's
+  single-stream audio figures (S-audio, and D1 and D2) carry it; F-audio's, from the LAN, don't.
 - **The capability host's purposes slower beside each other** in S-knee (L.6): not isolated.
 - **Neither arrangement held vision or audio at the load target of 4** (F, J).
 - **The 10-minute WAV** is 15,023 tokens, refused by an 8,192-token slot (E); the E4B keeps its
@@ -1202,7 +1241,7 @@ None of these is decided here.
   - the GPU's compute and memory bandwidth shared between vision and audio (and embedding) as the
     cause of the capability host's mixed-cell misses: memory capacity was never the limit there,
     gb10-2's lowest in any split cell being 68.69 GiB (H);
-  - what puts 0.4 to 0.6 s (medians) between single-stream audio requests after F-audio (L.7): the laptop,
-    the network path or the router.
+  - that the relay's cost grows with the payload and the round trip, so a larger audio window or
+    an image pays more than the 6 s clip's ~0.4 s (L.7).
 - From footprint's section K, still open (K.4): the Framework's system memory floor and its side of
   the prompt cache, the Gemma models' trained contexts, and the 26B-A4B on Vulkan past 4 slots.
