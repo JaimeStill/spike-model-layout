@@ -1,0 +1,24 @@
+# Role-split cell F-embed: granite-embedding-english-r2 on its section,
+# mrutkows/granite-embedding-english-r2-GGUF:BF16 (16 slots of 8,192 tokens), beside the rest of
+# set A on gb10-2: 512 synthetic tokens a request to /v1/embeddings at 1, 2, 4, 8 and 16 concurrent
+# streams, each level for 30 s, five benchmarks in one run, one JSON, read against the embedding
+# floor (4,300 prompt tok/s). Footprint L4's request (footprint-l4.yaml) at five levels; the
+# full-set arm only, since granite is unchanged in the split. An embedding has no output tokens,
+# streaming, TTFT, or ITL, so the figures are request latency and throughput. Engine-neutral: the
+# section and its tokenizer (ibm-granite/granite-embedding-english-r2) are given on the command
+# line, as `cell`'s <section> <tokenizer>, the JSON's path by `cell`, and the target in
+# GUIDELLM__SPEC__BACKEND__TARGET. Run from the repository root.
+spec:
+  backend:
+    kind: openai_http
+    request_format: /v1/embeddings
+  profile:
+    kind: concurrent
+    streams: [1, 2, 4, 8, 16]
+  data:
+    - kind: synthetic_text
+      prompt_tokens: 512
+  # Each level stops at 30 s; the requests in flight then are counted incomplete.
+  constraints:
+    - kind: max_duration
+      seconds: 30
