@@ -37,11 +37,10 @@ engine and network path" and L.7).
 
 ### The Framework as a second capability host
 
-The [framework finding](findings/framework.md) measured the Framework in the role the framework
-plan round chose from role-split's findings: a second capability host beside gb10-2, serving
-vision, audio and embedding, so each capability purpose has two hosts (sections F, G and J). It
-reran the split as the baseline in the same session. Every run was direct on the LAN, so these are
-LAN figures.
+The [framework finding](findings/framework.md) measured the Framework in the role chosen from
+role-split's findings: a second capability host beside gb10-2, serving vision, audio and
+embedding, so each capability purpose has two hosts (sections F, G and J). It reran the split as
+the baseline in the same session. Every run was direct on the LAN, so these are LAN figures.
 
 | Arrangement | Host | Role | Holds, each purpose alone | At the load targets, all at once (combined) | At the held levels, all at once (combined) | Lowest under load (floors) |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -50,8 +49,8 @@ LAN figures.
 | Split plus the Framework | gb10-1 | agent only | – | agent 4 of 4 (ITL 49.82 ms) | agent 4 of 4 (ITL 50.71 ms) | 12.51 GiB at the targets, 12.50 at the held levels (12.2) |
 | Split plus the Framework | gb10-2 and framework | vision, audio, embedding, streams split evenly | framework: vision 1, audio 2, embedding 16 streams | vision 0 of 4 (2 + 2: 21.54 and 19.37 s); audio 0 of 4 (RTFx 1.65 and 1.68); embedding 16 of 16 (25,644 tok/s) | vision 0 of 2 (13.89 and 11.94 s); audio 0 of 2 (RTFx 2.82 and 4.03); embedding 16 (27,711 tok/s) | gb10-2 69.12 GiB (12.2); framework 82.27 GiB GTT (11.2), 84.25 GiB system (12.5) |
 
-The second capability host about doubles embedding's throughput and holds neither vision nor audio
-at the target or at 1 stream a host. On the Framework, vision alone at 1 stream met its floor
+The second capability host about doubles embedding's throughput, and the two hosts together hold
+neither vision nor audio at the target or at 1 stream a host. On the Framework, vision alone at 1 stream met its floor
 (6.82 s) and audio alone did (RTFx 8.81); beside each other and embedding they missed (11.94 s,
 RTFx 4.03), with over 80 GiB free on both of the Framework's pools (framework finding, J and
 L.1). Two capability hosts hold at most 2 vision requests with nothing else running, against a

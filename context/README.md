@@ -32,9 +32,10 @@ and what context and how many concurrent sessions does each placed model hold?
    (one serves the agent model alone; the other serves vision, audio and embedding, with no
    agent), requests directed to a host by capability; the sessions and requests each holds, the
    speed per stream, and the memory each arrangement leaves.
-5. The Framework's role: where it relieves the most pressure, chosen from item 4's findings
-   (overflow for the full set, overflow for the agent, or capability host, noting Gemma 4
-   26B-A4B's Vulkan abort with several slots), measured in that role.
+5. The Framework's role: a second capability host beside gb10-2, chosen from item 4's findings
+   over overflow for the full set or for the agent, serving vision, audio and embedding (set A's
+   capped 4-slot 26B-A4B and E4B, and granite); what it holds per purpose, and what the split
+   plus the Framework holds against the split alone.
 6. The agent model alone on vLLM, in a container, against llama.cpp on one GB10, in one session,
    at the agent's load target: speed, TTFT under multi-turn load, memory, and cold start.
 7. On demand against resident: each model's cold load and first-request latency through
@@ -78,11 +79,12 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
 - **The footprint table:** each set A model's memory on a GB10 and on the Framework, and the
   capacity table placements are computed from, [`docs/findings/footprint.md`](../docs/findings/footprint.md).
 - **Measured sessions and requests** per placed model, at its context,
-  [`docs/findings/role-split.md`](../docs/findings/role-split.md).
+  [`docs/findings/role-split.md`](../docs/findings/role-split.md), with the Framework's in
+  [`docs/findings/framework.md`](../docs/findings/framework.md).
 - **The full-set and role-split comparison** across the two GB10s,
   [`docs/findings/role-split.md`](../docs/findings/role-split.md).
-- **The Framework's placement** in the layout, as a second capability host beside gb10-2,
-  [`docs/findings/framework.md`](../docs/findings/framework.md).
+- **The Framework's placement** in the layout, as a second capability host beside gb10-2 serving
+  vision, audio and embedding, [`docs/findings/framework.md`](../docs/findings/framework.md).
 - **The vLLM agent comparison** against llama.cpp.
 - **On-demand serving** through llama.cpp's router.
 - **Two-node serving** over QSFP with vLLM and Ray.
@@ -90,7 +92,9 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
 - **The step helpers:** `scripts/measure-lib.sh`, adapted from spike-hosting-upgrades' without its
   tier and conform helpers, sourced and called one step at a time, logging every command to this
   spike's `.state/measure/<host>/`. The read-only `footprint` helper prints each llama-server
-  process's memory, the pool, and the router's buffer lines.
+  process's memory, the pool, and the router's buffer lines. On an amdgpu host the helpers read
+  system memory beside GTT, and `watch` refuses to start without the system-memory floor
+  (`MEASURE_SYSTEM_FLOOR_GIB`) and stops a cell under either floor.
 - **The result readers:** `bench/levels.jq` turns GuideLLM's result JSON into per-level tables
   judged against each purpose's floor, and `bench/srvtimes.awk` with `bench/stats.awk` reads each
   request's server timings from the router log, [`bench/README.md`](../bench/README.md).
@@ -109,7 +113,8 @@ and load targets are agreed in its task's own plan round.
    session (evidence 3, 4). A pull request to spike-model-engines' `host/` first caps llama.cpp's
    host prompt cache (`cache-ram`) on set A's two Gemma sections, whose 8192 MiB default took
    gb10-1 under its floor under vision load (the footprint finding, section K).
-4. `framework`: the Framework in the role the role-split findings point to (evidence 3, 5).
+4. `framework`: the Framework as a second capability host beside gb10-2, serving set A's capped
+   26B-A4B and E4B and granite, against the split alone in one session (evidence 3, 5).
 5. `agent-vllm`: gpt-oss-120b on vLLM v0.33.0 in a container against llama.cpp on the agent GB10,
    in one session (evidence 6).
 6. `on-demand`: llama.cpp's router loading models on demand against keeping them resident, on

@@ -124,10 +124,10 @@ its request time), or mean prompt tok/s ≥4,300; a level with no successful req
 table starts with the knee GuideLLM concluded, when the profile reports one. Each row gives the
 request latency's median, p90 and minimum, and, for `vision`, the count of requests at ≤10 s, as
 it gives the count at RTFx ≥5 for audio: the per-request reading of the floor beside the median's
-verdict. With
-`--arg purpose client`, it prints GuideLLM's own per-request timings for one level instead
-(`--argjson level <i>`, default the first): the gap between requests, the time from request start
-to the first streamed chunk, the streaming time, and the audio bytes. Medians and percentiles interpolate linearly between the two nearest ranks.
+verdict. With `--arg purpose client`, it prints GuideLLM's own per-request timings for one level
+instead (`--argjson level <i>`, default the first): the gap between requests, the time from
+request start to the first streamed chunk, the streaming time, and the audio bytes. Medians and
+percentiles interpolate linearly between the two nearest ranks.
 
 ## Reading the router log: `srvtimes.awk`
 

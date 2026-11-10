@@ -9,7 +9,7 @@ and granite (embedding) at 16, one purpose at a time: **vision 1 request, audio 
 streams** (section F). It then sets the split plus the Framework, each capability purpose's
 streams spread evenly over gb10-2 and the Framework, against this session's baseline, the split
 alone, at the load targets and at role-split's held levels, with the memory each host leaves
-(section J). That answers evidence 5 in the role the framework plan round chose, adds the
+(section J). That answers evidence 5 in the role chosen from role-split's findings, adds the
 Framework's rows to evidence 3 (section I) and its capped capacity rows, measured (section K), and
 closes footprint's open items on the Framework's prompt cache, its system-memory floor, and the
 26B-A4B on Vulkan past 4 slots (K.4). It also found that:
@@ -28,7 +28,7 @@ closes footprint's open items on the Framework's prompt cache, its system-memory
 - gb10-1's agent-only host ran 0.30 to 0.36 GiB above its floor at its lowest in the last three
   cells (H, L.5).
 
-It decides nothing. The architect's walkthrough (slice 4) is still to run.
+It decides nothing.
 
 **Which figures size the layout.** Production clients sit on the same direct network as the GPUs,
 so the layout is sized on LAN figures (role-split's decision). Every run here went direct on the
@@ -155,11 +155,11 @@ file changed, `host/llama-preset/models.ini` (102 insertions, 10 deletions); `gi
 listed `main 21b5e8c [origin/main]` and the local `screen` branch untouched at 31b00eb. Then
 `docker restart llama`; health `{"status":"ok"}` within 4 s, and `/models` listed **12 sections**,
 every one unloaded, role-split's three new ones among them. Set A, from main at 3260dd0, was loaded
-before the move, and the restart unloaded it. Its two Gemma sections,
-loaded in E, print `--cache-ram 0`, `--no-cache-idle-slots` and `--swa-checkpoints 2`.
+before the move, and the restart unloaded it. Set A's two Gemma sections, loaded again in E, print
+`--cache-ram 0`, `--no-cache-idle-slots` and `--swa-checkpoints 2`.
 
-**The store clear (Behavior 3).** The Framework's store held the same extras as gb10-1 before the
-hosts task cleared them. A dry run of `hf cache rm` (21:26:51Z) named four repositories, 32.5G,
+**The store clear (Behavior 3).** The Framework's store held the same extras the hosts task
+cleared from gb10-1. A dry run of `hf cache rm` (21:26:51Z) named four repositories, 32.5G,
 with `/srv/models` at 120,363,420,735 bytes; the run itself (21:27:03Z,
 `.state/framework/framework-store-clear.log`) printed "Deleted 4 repo(s) and 4 revision(s); freed
 32.5G": `google/gemma-4-12B-it-qat-q4_0-gguf`, `google/gemma-4-31B-it-qat-q4_0-gguf`,
@@ -267,7 +267,7 @@ against the computation, before any request.
 A's 26B-A4B (6.1 s), E4B (3.1 s) and granite (3.1 s) loaded, nothing else; idle 30 s; read at
 21:48:47Z with no cache drop.
 
-| | Measured (m) | Computed in the plan round |
+| | Measured (m) | Computed before the session |
 | --- | --- | --- |
 | GTT available | **83.00 GiB**; GTT used 29.00 of 112.00 GiB | ~83.0 GiB |
 | System memory available | **87.13 GiB** | ~87 GiB |
@@ -435,8 +435,8 @@ at the held level (F). Granite has no TTFT or ITL; its figure is prompt tok/s.
 
 ## J. Evidence 5: the split plus the Framework against the baseline
 
-The Framework's role is the capability host, chosen in the plan round from role-split's findings
-(goal record, Decisions): it serves vision, audio and embedding beside gb10-2, each capability
+The Framework's role is the capability host, chosen before the session from role-split's
+findings (goal record, Decisions): it serves vision, audio and embedding beside gb10-2, each capability
 purpose with two hosts. **The comparison**, every figure from D and G, "holds" counted as the
 streams on hosts whose figure met the floor:
 
