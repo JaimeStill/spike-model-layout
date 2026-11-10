@@ -216,7 +216,7 @@ Door          two-way: the pull request reverts by commit, and its
 ## Progress
 
 - Slice 1 done (no tracked change beyond 5842e6d): stack read; role-split pushed to both GB10s as hosts-next, clones on `hosts`, routers restarted; anchors A and B on both (B missed once at 2.71% on one errored request, repeat within noise: parity holds); full-set arm on gb10-2, every cell completed above the floor. Raw output in `.state/measure/gb10-{1,2}/2026-11-10.log` and `.state/role-split/`. gb10-2 serves capped set A, gb10-1 nothing loaded.
-- Open: escalation on granite's uncapped idle-slot saves and F-L2's 31 of 32 (one Gemma 4 parser error). Next: slice 2, the split.
+- Escalation answered. Next: slice 2, the split.
 
 ## Decisions
 
@@ -310,6 +310,8 @@ Door          two-way: the pull request reverts by commit, and its
 - role-split (BUILD): the mixed and S-knee cells set streams through `GUIDELLM__SPEC__PROFILE__STREAMS`, which GuideLLM reads only when the file leaves `streams` out, so `cell` runs them unchanged; the load targets live in `bench/README.md` and each file's header.
 - role-split (BUILD): the mixed audio file reads the 73 clips 12 times (876 rows), since GuideLLM doesn't reuse a source and 73 clips last ~70 s at 4 streams; the knee files keep 73 rows, capped at 64 requests a level.
 - role-split (BUILD): F-L2 reuses `bench/footprint-l2.yaml` unchanged; the F-probe recipe lives in `bench/README.md`, its WAV cut locally to `.state/role-split/ami-es2002a-first10min.wav` (600.000 s, 16 kHz mono).
+- role-split (BUILD, escalation): granite stays unchanged in both arms; its idle-slot prompt-cache saves (177,658 log lines in F-embed, 43,743 in F-mixed; RSS 827 -> 965 MiB) are recorded as a finding and its cap as an intake note (the architect).
+- role-split (BUILD, escalation): F-L2's 31 of 32 meets Behavior 4 on memory (lowest 17.80 GiB); the one Gemma 4 output-parser error ("does not match the expected peg-gemma4 format") is recorded as a finding, not caused by the cap, and F-L2 isn't rerun (the architect).
 
 ## Pending edits
 
@@ -324,3 +326,4 @@ Door          two-way: the pull request reverts by commit, and its
 - coordinator · intake note (ai-hosting.md, experiment.hosting, "Gaps in the answer": the vision section's prompt-cache keys still to verify): the shared preset's 26B-A4B QAT and E4B sections set no `cache-ram`, so each process's host prompt cache defaults to 8192 MiB; under vision load it took gb10-1 under its floor, and on the Framework it sits in system memory, outside the GTT floor (spike-model-layout `docs/findings/footprint.md`, sections G and K). Capping it is role-split's pull request to spike-model-engines' `host/`.
 - coordinator · intake note (roadmap.toml, the comment "Inputs to sizing set A's slots"): the vision line's ~477 tokens a page is the model's default image-max-tokens on ggml-org's weights; on the QAT section, `image-min-tokens = 560` and `ub = 1120` put an image at 560 to 1,120 tokens. The audio line's 32,768-token context is the E4B section's total; each of its 4 slots holds 8,192 tokens, under the 10-minute WAV's 15,028 (spike-model-layout `docs/findings/footprint.md`, section I.6; sizing that request is role-split's).
 - spike-model-engines · intake note: `docs/engines/llama.cpp/models.md` (outside host/) does not list role-split's three new sections or the Gemma cap keys; measure-lib's `gate` on a Framework clone carrying them would load the 16-slot 26B-A4B section, which aborts on Vulkan past 4 slots.
+- spike-model-engines · intake note: granite's section sets no cache keys, so every embedding request saves its idle slot to the prompt cache (177,658 saves in one 2.5-min sweep on gb10-2); `cache-idle-slots = false` and `cache-ram = 0` would stop it (spike-model-layout `docs/findings/role-split.md`).
