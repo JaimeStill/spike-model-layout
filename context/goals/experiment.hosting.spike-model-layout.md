@@ -1,6 +1,6 @@
 # goal · experiment.hosting.spike-model-layout
 
-- **State:** building
+- **State:** brief ready
 - **Task:** role-split
 - **Branch:** role-split
 
@@ -219,7 +219,7 @@ Door          two-way: the pull request reverts by commit, and its
 - Escalation 1 answered (granite unchanged, F-L2 not rerun).
 - Slice 2 done (no tracked change): the split loaded (gb10-1 agent-only 1.39 GiB above its floor idle, 0.27 GiB under load; gb10-2 77.40 GiB available), S-agent/S-vision/S-audio, S-mixed and S-knee all completed above the floor; hosts end as Behavior 12 states.
 - Slice 3 done: 89f31bc (finding, layout, README links), dce714c (vision encode evidence), 187fde7 (D1/D2, escalation 2: slot count doesn't explain the audio slowdown), 64bd3a1 (each arm's network path, escalation 3: no LAN rerun), the review escalation's fixes (af0ad3e, 56bf1a6, fd80f62, 77f3ad5, 1ea5299, fbdf354: figures from jq and awk, commands as run, L.7's curl timing), and the editor pass (the production-network decision across the finding and layout).
-- Next: slice 4, the architect's walkthrough.
+- Slice 4 done: the architect's walkthrough reproduced G and D.1's level 4 (6d1c636, 2e975cb). Session brief written; next: the architect's accept or redirect, then SHIP.
 
 ## Decisions
 
