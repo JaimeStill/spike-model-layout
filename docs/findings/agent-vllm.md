@@ -50,6 +50,8 @@ It decides nothing.
 the figures; the spike records it and decides nothing.
 
 - On this session's figures, **vLLM is the stronger agent engine on gb10-1.**
+- **The architect's view:** vLLM is the more attractive engine for the agent, chiefly for its
+  concurrency (F: the floor met through 8 and 12 sessions against llama.cpp's 4).
 - **The FP8 row leads the BF16 row**: it met the floor through 12 sessions against 8, gave 65.16
   tok/s at the target of 4 against 55.85, and its cache holds about 13 sessions of 131,072 tokens
   (c) against 6. That holds if its output quality matches BF16's.
@@ -73,8 +75,9 @@ for "holds" (the highest such level at or below GuideLLM's knee), llama.cpp and 
 hold 4 and 12; the BF16 row's knee is 6.71, so it holds 4 by the rule, though 8 met the floor (F).
 
 **Which figures size the layout.** Production clients sit on the same direct network as the GPUs,
-so the layout is sized on LAN figures (role-split's decision). Every run here went direct on the
-LAN, 0 to 2 ms to gb10-1, so client-side and server-side figures both stand as LAN figures.
+so the layout is sized on LAN figures (role-split's decision). Every run with a recorded ping went
+direct on the LAN, 0 to 2 ms to gb10-1, so client-side and server-side figures both stand as LAN
+figures; the stack read and the staging, which measured nothing, recorded none (M).
 
 | Host | Serves at the end of the session |
 | --- | --- |
@@ -98,8 +101,10 @@ network path"): the root updates moved no kernel, driver or Mesa, and no contain
 them. Nothing on gb10-2 or the Framework changed after this read: no load, request, clone move or
 anchor.
 
-**Network path.** `tailscale ping -c 1 gb10-1` from the laptop preceded every run on gb10-1, each
-dated in `.state/agent-vllm/ping-2026-11-11.txt`, and every pong came via gb10-1's LAN address:
+**Network path.** `tailscale ping -c 1 gb10-1` from the laptop preceded every run on gb10-1 but
+the stack read and the staging steps, each dated in `.state/agent-vllm/ping-2026-11-11.txt`, and
+every pong came via gb10-1's LAN address. The stack read and the staging steps recorded no ping;
+the staging's downloads ran on gb10-1 itself (M):
 
 | Run | Ping (UTC) | Pong |
 | --- | --- | --- |
@@ -119,7 +124,7 @@ dated in `.state/agent-vllm/ping-2026-11-11.txt`, and every pong came via gb10-1
 | F-cap | 16:48:50 | 2 ms |
 | Restore (Behavior 14) | 16:52:44 | 2 ms |
 
-**Every run in this finding went direct on the LAN, 0 to 2 ms.** Had the laptop been off the LAN,
+**Every run with a recorded ping went direct on the LAN, 0 to 2 ms.** Had the laptop been off the LAN,
 the relay's trip would have landed on the client-side figures only (TTFT, request latency); ITL
 and memory don't carry the path ([role-split](role-split.md), L.7).
 
@@ -270,9 +275,11 @@ warm-up request (vLLM) or none (llama.cpp), 30 s idle, and a cache drop.
 llama.cpp's 48.4 s (c)**; nearly all of it is reading the weights (446 to 468 s). The first start,
 recorded apart, took 555.9 s. The FP8 start compiled afresh, since the KV dtype is part of the
 compile hash (its log saved a new AOT function, `96b6f1cb…`, beside BF16's `93145931…`), and its
-weight load (460.83 s) is within 4.0 s (c) of BF16's timed one (456.81 s). Against v0.32.0's
-gpt-oss-120b starts on gb10-1, 576.5 and 546.3 s with weights in 503.4 and 509.4 s
-(spike-model-engines' bench-gb10-container finding, cited), v0.33.0's timed start is shorter.
+weight load (460.83 s) is within 4.0 s (c) of BF16's timed one (456.81 s). v0.32.0's
+gpt-oss-120b starts on gb10-1 took 576.5 and 546.3 s with weights in 503.4 and 509.4 s
+(spike-model-engines' bench-gb10-container finding, cited); they stand beside v0.33.0's as a
+record across versions, not a comparison, since the version, the row's max-model-len and the
+session all differ.
 
 **What the start is.** Model loading took 456.81 s of the BF16 row's 503.1 s timed start, about
 30 s a shard over the 15 shards (c: 446.09 s of weight reads / 15); the compiled graphs loaded from
@@ -308,7 +315,7 @@ floor (c), at 16:37:46Z, the second of the graph capture (L.2).
 From each start log, by `footprint` (`bf16-restart.out`, `fp8-update.out`) and re-read from the
 saved logs (`vllm-first-start.log`, `vllm-bf16-run.log`, `vllm-fp8-start.log`):
 
-| | BF16, first start (compiling) | BF16, timed restart | FP8 | v0.32.0, gpt-oss-120b (cited) |
+| | BF16, first start (compiling) | BF16, timed restart | FP8 | v0.32.0, gpt-oss-120b (cited; a record across versions, not a comparison) |
 | --- | --- | --- | --- | --- |
 | Sizing arguments | `'max_model_len': 131072, 'gpu_memory_utilization': 0.8, 'max_num_seqs': 16` | the same | the same with `'kv_cache_memory_bytes': 32993476982, 'kv_cache_dtype': 'fp8'` | max-model-len 8192, 0.80, 16 |
 | Model loading | 66.14 GiB, 478.04 s | 66.14 GiB, 456.81 s | 66.14 GiB, 460.83 s | 66.14 GiB, 503.4 s |
@@ -323,6 +330,20 @@ v0.32.0's round 5 rerun of the same row read 28.35 GiB and 544,172 tokens (cited
 cache moves with the start (L.1). The FP8 row's 1,733,910 tokens are the measured figure; the
 row's 1,179,648 were computed in the brief from half of v0.32.0's bytes a token (27,969 bytes, c:
 32,993,476,982 / 1,179,648). It holds 47% more (c).
+
+**Where 32,993,476,982 comes from.** It is the row's chosen sizing input, computed before the
+session, not a measured figure. The scratch computation that produced it wasn't quoted; this awk
+command reproduces it exactly from v0.32.0's two logged BF16 accountings of gpt-oss-120b (25.71 GiB
+for 493,523 tokens, 28.35 GiB for 544,172; bench-gb10-container, "Cold load and footprint",
+cited): the mean of their bytes a token (55,936.40 and 55,939.26, c), halved for FP8, times
+1,179,648. It prints `32993476982`; the product before rounding is 32,993,476,981.77 (c).
+
+```sh
+awk 'BEGIN { g = 1024 ^ 3; a = 25.71 * g / 493523; b = 28.35 * g / 544172; printf "%.0f\n", (a + b) / 2 / 2 * 1179648 }'
+```
+
+The FP8 row keeps `--gpu-memory-utilization 0.80` beside `--kv-cache-memory-bytes`: vLLM sizes the
+cache from the bytes, and the 0.80 still sets the startup free-memory check.
 
 ## E. Backends (Behaviors 6, 11)
 
@@ -581,9 +602,9 @@ and framework found; vLLM's container RSS grew under 100 MiB a row.
 
 | Run | Tool and configuration | Load | Duration | Path | Decision it informs |
 | --- | --- | --- | --- | --- | --- |
-| Stack read | SSH read-only, all three hosts; `apt-get -s upgrade` on the GB10s | none | one read | direct | Behavior 1's record (Stack, A.1) |
+| Stack read | SSH read-only, all three hosts; `apt-get -s upgrade` on the GB10s | none | one read | no ping recorded | Behavior 1's record (Stack, A.1) |
 | Push and clone move | `git push gb10-1:… agent-vllm:hosts-next`; `git checkout -B hosts hosts-next` on gb10-1 | none | one step | direct, 2 ms | the rows on gb10-1 before merge (A.2) |
-| Staging | `hf download` and `docker pull`, in parallel, in the background on gb10-1 | none | 50 and 54 min | direct | starts that read, not download (A.3) |
+| Staging | `hf download` and `docker pull`, in parallel, in the background on gb10-1 | none | 50 and 54 min | no ping recorded; the downloads ran on gb10-1 itself | starts that read, not download (A.3) |
 | llama.cpp baseline | `unload --all`, cache drop, `load gpt-oss-120b-MXFP4-agent-only`, 30 s idle, read | none | 48.4 s load | direct, 2 ms | llama.cpp's cold start and idle pool (C) |
 | L-agent | GuideLLM 0.8.1, `cell`, `bench/role-split-agent-split.yaml`, agent-only section | 4-turn sessions, [1,4,8,12,16] | 110 s a level, 591 s | direct, 1 ms | llama.cpp's sessions at the floor (F, G) |
 | vLLM install, BF16 first start | `docker stop llama`; `VLLM_MODEL=gpt-oss-120b-agent host/engines vllm install` | none | 555.9 s | direct, 2 ms | the compile cache filled; recorded apart (C, D) |
@@ -975,6 +996,7 @@ EOF
 cat vllm-install.sh | head -3
 
 # 2026-11-11T15:52:19Z
+# Note, not part of the command: `python3 -` ran with no input and did nothing; the perl edit swapped bc for awk in vllm-wait.sh.
 cd /home/jaime/experiments/spike-model-layout/.state/agent-vllm/step-files && python3 - 2>/dev/null; perl -0pi -e 's/\$\(echo "\$\(date \+%s\.%N\) - \$t0" \| bc\)/\$(awk -v a="\$(date +%s.%N)" -v b="\$t0" "BEGIN { print a - b }")/; s/"\$\(echo "\$\(date -d "\$ts" \+%s\.%N\) - \$\(date -d "\$ht0" \+%s\.%N\)" \| bc\)"/"\$(awk -v a="\$(date -d "\$ts" +%s.%N)" -v b="\$(date -d "\$ht0" +%s.%N)" "BEGIN { print a - b }")"/; s/"\$\(echo "\$\(date -d "\$ts" \+%s\.%N\) - \$\(date -d "\$started" \+%s\.%N\)" \| bc\)"/"\$(awk -v a="\$(date -d "\$ts" +%s.%N)" -v b="\$(date -d "\$started" +%s.%N)" "BEGIN { print a - b }")"/' vllm-wait.sh && grep -n "awk -v a\|bc" vllm-wait.sh; bash -n vllm-wait.sh && date -d 2026-11-11T16:00:00.123456789Z +%s.%N
 
 # 2026-11-11T15:52:23Z
@@ -1124,7 +1146,22 @@ None of these is decided here.
 - **For the next task, the capability models on vLLM:** each vLLM start reads the hub (A.3), a
   0.80 row's cache moves with the compile cache (L.1), the suite runs one `vllm` container on port
   8000, so a model per process means more containers or rows than `host/engines` serves today, and
-  the step helpers' `footprint` and `readout` already read a vLLM container (B).
+  the step helpers' `footprint` and `readout` already read a vLLM container (B). On the
+  Framework, from the session's research of 2026-11-11 (GitHub, cited, not measured):
+  - #58868, the GB10 loading fix (in v0.34.0rc0, not v0.33.0; C), doesn't reach ROCm. Only the
+    CUDA platform implements `is_integrated_gpu`; the base default returns False (checked at
+    v0.34.0rc0, `vllm/platforms/interface.py`, `cuda.py`, `rocm.py`).
+  - Its ROCm counterpart, #49991, "[ROCm] Add VLLM_ROCM_CLONE_MMAP_WEIGHTS to avoid slow H2D
+    copies from mapped weights", is opt-in, open, and stalled since 2026-09-25. Its kernel cause
+    was fixed in Ubuntu 7.0.0-30; the Framework runs Arch.
+  - No upstream issue targets vLLM startup on gfx1151. Upstream gfx1151 work is kernel and
+    tuning: #50436, #63455, #57614.
+  - The Framework's vLLM load time is unmeasured in this spike, so the next task should measure
+    it.
+- **Intake note, spike-model-engines (vLLM docs):** `docs/engines/vllm/models.md` (lines ~81, 110,
+  209, 226, 268-269) and `docs/engines/vllm/api.md` (~11, 102, 142, 148) still describe v0.32.0,
+  and neither lists the `gpt-oss-120b-agent` or `gpt-oss-120b-agent-fp8` rows. Both are outside
+  `host/`, and this spike changes only `host/`, so the edit is spike-model-engines' own.
 - **For two-node:** gb10-1 keeps vLLM v0.33.0's image, its compile cache and gpt-oss-120b's
   safetensors (End state); gb10-2 holds none of them, and staging took 50 min for the weights and
   54 for the image on gb10-1 (A.3). v0.33.0's ~38,058 bytes a token in BF16 and ~19,028 in FP8 (c)
