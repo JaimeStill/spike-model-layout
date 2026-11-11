@@ -97,8 +97,8 @@ figures both stand as LAN figures.
 | Host | Serves at the end of the session (Behavior 13) |
 | --- | --- |
 | gb10-1 | as agent-vllm left it: `gpt-oss-120b-MXFP4-agent-only` on llama.cpp (`llama` up 2 hours at the stack read), the `vllm` container Exited (0); clone on `main` at a294e4e, agent-vllm's merge. Read only, for the stack |
-| gb10-2 | llama.cpp's `gemma-4-26B-A4B-it-qat-Q4_0-16-slots`, `gemma-4-E4B-it-Q8_0-16-slots` and granite, reloaded fresh at 22:58:18Z: 77.51 GiB available. `vllm-vision`, `vllm-audio` and `vllm-embed` Exited (0), the image `vllm/vllm-openai:v0.33.0` (d825baf9ce4b), the compile cache (438M) and the three models' safetensors kept. spike-model-engines' clone on a local `hosts` branch at 4ad76e6 |
-| framework | llama.cpp's capped `google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0` and `ggml-org/gemma-4-E4B-it-GGUF:Q8_0` and granite, reloaded fresh at 22:58:18Z: 82.97 GiB GTT and 89.02 GiB system memory available. The three vLLM containers Exited (0); `vllm/vllm-openai-rocm:v0.33.0` and `:v0.33.0-rocm72`, both audio images, the compile cache (982M) and the safetensors kept. Clone on a local `hosts` branch at 4ad76e6 |
+| gb10-2 | llama.cpp's `gemma-4-26B-A4B-it-qat-Q4_0-16-slots`, `gemma-4-E4B-it-Q8_0-16-slots` and granite, reloaded fresh at 22:58:18Z: 77.51 GiB available. `vllm-vision`, `vllm-audio` and `vllm-embed` Exited (0), the image `vllm/vllm-openai:v0.33.0` (d825baf9ce4b), the compile cache (438M) and the three models' safetensors kept. spike-model-engines' clone on a local `hosts` branch at bb68cbd, the pull request's head, moved from 4ad76e6 after the reviews; every run measured at 4ad76e6 ("Commands not in a step log") |
+| framework | llama.cpp's capped `google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0` and `ggml-org/gemma-4-E4B-it-GGUF:Q8_0` and granite, reloaded fresh at 22:58:18Z: 82.97 GiB GTT and 89.02 GiB system memory available. The three vLLM containers Exited (0); `vllm/vllm-openai-rocm:v0.33.0` and `:v0.33.0-rocm72`, both audio images, the compile cache (982M) and the safetensors kept. Clone on a local `hosts` branch at bb68cbd, moved from 4ad76e6 as gb10-2's |
 
 ## Stack, engine and network path
 
@@ -168,7 +168,7 @@ vLLM v0.33.0 (`/version` read `{"version":"0.33.0"}` on all six rows), run by sp
 | gb10-2 | `vllm/vllm-openai:v0.33.0` (`sha256:d825baf9…`, arm64) | `gemma-4-26B-A4B-NVFP4-vision-gb10` | `vllm-vision`, 8000 | `nvidia/Gemma-4-26B-A4B-NVFP4 --host 0.0.0.0 --port 8000 --max-num-seqs 16 --max-model-len 8192 --gpu-memory-utilization 0.40 --kv-cache-dtype bfloat16 --reasoning-parser gemma4 --enable-auto-tool-choice --tool-call-parser gemma4` |
 | gb10-2 | as above | `gemma-4-E4B-it-audio-gb10` | `vllm-audio`, 8001 | `google/gemma-4-E4B-it --host 0.0.0.0 --port 8001 --max-num-seqs 16 --max-model-len 8192 --gpu-memory-utilization 0.20 --kv-cache-dtype bfloat16 --reasoning-parser gemma4 --enable-auto-tool-choice --tool-call-parser gemma4` |
 | gb10-2 | as above | `granite-embedding-english-r2-gb10` | `vllm-embed`, 8002 | `ibm-granite/granite-embedding-english-r2 --host 0.0.0.0 --port 8002 --runner pooling --max-num-seqs 16 --max-model-len 8192 --gpu-memory-utilization 0.05` |
-| framework | `vllm/vllm-openai-rocm:v0.33.0`, ROCm 10.0 (`sha256:4fcd39b7…`, amd64) | `gemma-4-26B-A4B-it-vision-framework` | `vllm-vision`, 8000 | `google/gemma-4-26B-A4B-it --host 0.0.0.0 --port 8000 --max-num-seqs 16 --max-model-len 8192 --gpu-memory-utilization 0.60 --kv-cache-dtype bfloat16 --reasoning-parser gemma4 --enable-auto-tool-choice --tool-call-parser gemma4` |
+| framework | `vllm/vllm-openai-rocm:v0.33.0`, ROCm 10.0 (`sha256:4fcd39b7…`, amd64; `-rocm100`'s digest, "Commands not in a step log") | `gemma-4-26B-A4B-it-vision-framework` | `vllm-vision`, 8000 | `google/gemma-4-26B-A4B-it --host 0.0.0.0 --port 8000 --max-num-seqs 16 --max-model-len 8192 --gpu-memory-utilization 0.60 --kv-cache-dtype bfloat16 --reasoning-parser gemma4 --enable-auto-tool-choice --tool-call-parser gemma4` |
 | framework | `spike-model-engines/vllm-openai-rocm-audio:v0.33.0` (298c73773c66), built on the image above | `gemma-4-E4B-it-audio-framework` | `vllm-audio`, 8001 | `google/gemma-4-E4B-it --host 0.0.0.0 --port 8001 --max-num-seqs 16 --max-model-len 8192 --gpu-memory-utilization 0.18 --kv-cache-dtype bfloat16 --reasoning-parser gemma4 --enable-auto-tool-choice --tool-call-parser gemma4` |
 | framework | `vllm/vllm-openai-rocm:v0.33.0` | `granite-embedding-english-r2-framework` | `vllm-embed`, 8002 | `ibm-granite/granite-embedding-english-r2 --host 0.0.0.0 --port 8002 --runner pooling --max-num-seqs 16 --max-model-len 8192 --gpu-memory-utilization 0.03` |
 
@@ -238,7 +238,7 @@ capability rows on v0.33.0's ROCm 10.0", on spike-model-engines' `capability-vll
 - llama's install and update, and the native installs and updates, refuse while any vLLM container
   runs; vLLM still refuses while llama runs.
 - `vllm.env`: the rocm flavor stays on v0.33.0's default tag, its ROCm 10.0 build (the same
-  digest as `-rocm100`, `sha256:4fcd39b7…`); `VLLM_ROCM_FALLBACK=rocm72` names the fallback, chosen
+  digest as `-rocm100`, `sha256:4fcd39b7…`, read from Docker Hub in "Commands not in a step log"); `VLLM_ROCM_FALLBACK=rocm72` names the fallback, chosen
   for one run by `VLLM_ROCM_BUILD=rocm72`.
 - `vllm-rocm-audio/Dockerfile`: rebuilt on the default ROCm image by digest, with av 19.0.2,
   soundfile 0.14.0 and soxr 1.1.0, and a rocm72 stage.
@@ -606,7 +606,7 @@ against 8.81).
   leads (3.54 against 4.12 s; 4.63 against 6.83 s), on TTFT (336 against 2,690 ms), with a higher
   ITL (32.40 against 14.36 ms).
 - **Embedding**: vLLM gave 1.34 to 4.40 times llama.cpp's prompt tok/s on gb10-2 across levels
-  (c: 36,850 / 27,445 at 1; 126,643 / 28,762 at 16) and 3.78 to 4.72 times on the Framework (c),
+  (c: 36,850 / 27,445 at 1; 126,643 / 28,762 at 16) and 3.78 to 4.75 times on the Framework (c),
   peaking at 8 streams on gb10-2 (157,525) and still rising at 16 on the Framework (96,803).
 
 ## H. The mixed cells at the targets (Behavior 9)
@@ -1956,4 +1956,30 @@ cd /home/jaime/experiments/spike-model-layout && D=<scratchpad>; for h in gb10-2
 
 ```sh
 cd /home/jaime/experiments/spike-model-layout && M=.state/measure A=.state/capability-vllm; { date -u +%FT%TZ; for e in l v; do for h in gb10-2 framework; do for c in vision audio embed mixed-vision mixed-audio mixed-embed two-vision two-audio two-embed; do p=${c##*-}; echo "# $h $e-$c (exit $(cat $M/$h/capability-vllm-$e-$c.exit))"; jq -r --arg purpose $p -f bench/levels.jq $M/$h/capability-vllm-$e-$c.json; done; done; done; for l in $A/*-first-*.log $A/*-cold-*.log; do echo "# ${l#$A/}"; grep -E 'Loading weights took|Model loading took|Available KV cache memory|GPU KV cache size|Free memory on device|Using .*[Bb]ackend|Directly load AOT|Application startup complete' $l | sed -E 's/^\((EngineCore|APIServer) pid=[0-9]+\) //' | cut -c1-220; done; } > $A/jq-figures-slice3.txt 2>&1; echo rc $?; wc -l $A/jq-figures-slice3.txt; grep -c MISSES $A/jq-figures-slice3.txt
+```
+
+**After the reviews**, the standards review added bb68cbd, "vllm.sh: say that update removes a
+staged ROCm fallback image", a comment-only change to `host/vllm.sh` (3 lines added, 1 removed), on
+top of 4ad76e6. The session then moved both capability hosts' clones to it (23:2xZ); the same two
+commands ran for `framework`:
+
+```sh
+git push gb10-2:repos/spike-model-engines capability-vllm:hosts-next   # 4ad76e6..bb68cbd
+ssh gb10-2 'cd ~/repos/spike-model-engines && git checkout -B hosts hosts-next'   # "Reset branch 'hosts'"; hosts bb68cbd
+```
+
+Afterwards `curl http://<host>:8080/health` returned `{"status":"ok"}` on gb10-2 and the Framework
+(23:29:18Z). No figure was taken at bb68cbd: every run above measured the clones at 4ad76e6.
+
+**The ROCm tags' digests** (2026-11-11T23:29:44Z), read from Docker Hub into
+`.state/capability-vllm/tag-digests.out`: v0.33.0's default tag and `-rocm100` share one digest,
+the one the Framework's rows ran ("Stack, engine and network path"); `-rocm72` is a different image.
+
+```sh
+curl -s https://hub.docker.com/v2/repositories/vllm/vllm-openai-rocm/tags/v0.33.0 | jq -r .digest
+# sha256:4fcd39b758b660c4e9c345c021e2ea8f0ccdb31e3c32507d676cc3005ae83fba
+curl -s https://hub.docker.com/v2/repositories/vllm/vllm-openai-rocm/tags/v0.33.0-rocm100 | jq -r .digest
+# sha256:4fcd39b758b660c4e9c345c021e2ea8f0ccdb31e3c32507d676cc3005ae83fba
+curl -s https://hub.docker.com/v2/repositories/vllm/vllm-openai-rocm/tags/v0.33.0-rocm72 | jq -r .digest
+# sha256:4fe7bc121cbe2f0791ebc38dcc2f0d615612233b4bfc0c1f4b9daeab05aba182
 ```
