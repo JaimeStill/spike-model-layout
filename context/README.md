@@ -85,19 +85,24 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
   [`docs/findings/role-split.md`](../docs/findings/role-split.md).
 - **The Framework's placement** in the layout, as a second capability host beside gb10-2 serving
   vision, audio and embedding, [`docs/findings/framework.md`](../docs/findings/framework.md).
-- **The vLLM agent comparison** against llama.cpp.
+- **The vLLM agent comparison** against llama.cpp on gb10-1,
+  [`docs/findings/agent-vllm.md`](../docs/findings/agent-vllm.md).
 - **On-demand serving** through llama.cpp's router.
 - **Two-node serving** over QSFP with vLLM and Ray.
 - **The layout document:** [`docs/layout.md`](../docs/layout.md), living, finalized by the answer.
 - **The step helpers:** `scripts/measure-lib.sh`, adapted from spike-hosting-upgrades' without its
   tier and conform helpers, sourced and called one step at a time, logging every command to this
   spike's `.state/measure/<host>/`. The read-only `footprint` helper prints each llama-server
-  process's memory, the pool, and the router's buffer lines. On an amdgpu host the helpers read
-  system memory beside GTT, and `watch` refuses to start without the system-memory floor
-  (`MEASURE_SYSTEM_FLOOR_GIB`) and stops a cell under either floor.
+  process's memory, the pool, and the router's buffer lines. Sourced for port 8000, `footprint`
+  and `readout` read the `vllm` container instead (`MEASURE_ENGINE` overrides the choice):
+  `footprint` prints its processes' memory, the pool, and the start log's sizing lines, and
+  `readout` prints vLLM's `/metrics` and counts the server log's errors. On an amdgpu host the
+  helpers read system memory beside GTT, and `watch` refuses to start without the system-memory
+  floor (`MEASURE_SYSTEM_FLOOR_GIB`) and stops a cell under either floor.
 - **The result readers:** `bench/levels.jq` turns GuideLLM's result JSON into per-level tables
-  judged against each purpose's floor, and `bench/srvtimes.awk` with `bench/stats.awk` reads each
-  request's server timings from the router log, [`bench/README.md`](../bench/README.md).
+  judged against each purpose's floor, `bench/srvtimes.awk` with `bench/stats.awk` reads each
+  request's server timings from the router log, and `bench/capacity.jq` with `bench/readouts.awk`
+  reads the vLLM capacity cell, [`bench/README.md`](../bench/README.md).
 
 ## Path
 

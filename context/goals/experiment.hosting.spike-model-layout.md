@@ -10,215 +10,253 @@
 2. [x] footprint
 3. [x] role-split
 4. [x] framework
-5. [ ] agent-vllm
+5. [x] agent-vllm
 6. [ ] on-demand
 7. [ ] two-node
 8. [ ] answer
 
-## Task brief · framework
+## Task brief · agent-vllm
 
 ```
-Problem       Role-split found that gb10-2, the capability host, misses
-              vision and audio together even at 1 stream each (vision
-              10.14 s, audio RTFx 2.26) with 68.85 GiB free, and neither
-              arrangement held vision or audio at the load target of 4.
-              The agent met its target alone on gb10-1. The Framework
-              hasn't been measured in any role since footprint, and then
-              only uncapped, with its prompt cache in system memory that
-              the GTT floor watch can't see. Nothing has measured whether
-              a second capability host, the Framework serving vision,
-              audio and embedding beside gb10-2, adds the capacity a
-              router could spread across, or what the Framework holds at
-              each purpose's floor.
+Problem       vLLM leads gpt-oss-120b from 4 streams on gb10-1 (v0.32.0:
+              168.2 against llama.cpp's 129.0 tok/s at 16), but nothing
+              has measured it at the agent's load target or in the
+              agent's multi-turn sessions. Nothing has compared its memory
+              with the agent-only section's: one unified pool of
+              1,179,648 tokens over 16 slots, 1.39 GiB above gb10-1's
+              floor idle and 0.27 GiB under load. At 0.80 of the pool,
+              vLLM's BF16 KV cache held 493,523 tokens, about 3.8 sessions
+              of 131,072 against llama.cpp's 9. An FP8 KV cache could
+              hold llama.cpp's 1,179,648 tokens in about 30.73 GiB, but
+              that is unproven for gpt-oss's attention sinks on SM121.
+              Its cold start took 546-577 s against llama.cpp's 48 s. The
+              pin is held at v0.32.0. vLLM v0.33.0 is out as a tag and
+              images on the same commit as v0.33.0rc3, which is still the
+              name of GitHub's release.
 Behaviors     1. Every host has no pending OS updates at the session's
-                 start: the Framework's 4 (pacman) and each GB10's 3 (apt)
-                 applied by the architect. Each host's stack is recorded,
-                 and `tailscale ping` to each host is recorded with the
-                 date before every run. Runs go on whatever path the
-                 laptop has; the finding names each run's path and notes
-                 that off-LAN latency may slightly affect client-side
-                 timing figures (TTFT, request latency, RTFx).
-              2. The Framework's spike-model-engines clone moves from
-                 3260dd0 to main at 21b5e8c, and its router restarts to
-                 read it. Its /models lists main's 12 sections, and set
-                 A's two Gemma sections, when loaded, print cache-ram 0,
-                 no-cache-idle-slots and 2 checkpoints. No step loads
-                 the 16-slot 26B-A4B, the 16-slot E4B or the agent-only
-                 section on the Framework. No pull request to host/.
-              3. The Framework's store holds only set A's four models:
-                 the Gemma 4 12B, 31B and E4B QAT GGUFs and granite's
-                 safetensors are removed. Their preset sections stay
-                 listed and don't load, as on the GB10s.
-              4. On an amdgpu host, the step helpers' memory read and
-                 watch's samples carry system MemAvailable beside GTT.
-                 watch stops a cell when either falls under its floor:
-                 GTT 11.2 GiB, system memory 12.5 GiB (10% of 128,075
-                 MiB). A cell's summary gives the lowest of each. A GB10
-                 reads and stops as before (MemAvailable, 12.2 GiB). The
-                 check passes.
-              5. Anchors A and B run once each on the Framework, each on
-                 a freshly loaded gpt-oss-120b set-a section alone. Output
-                 tok/s and ITL are read against the hosts finding's R3
-                 and R4 (b12098: A 43.90, B 70.72 tok/s) within the
-                 Framework's across-days 2.8%. They don't block anything:
-                 a miss is a finding. The Framework's figures are never
-                 compared with the GB10s' as host parity.
-              6. Baseline. Before the first baseline cell, gb10-1 reloads
-                 the agent-only section, and gb10-2 the 16-slot 26B-A4B,
-                 the 16-slot E4B and granite, each from a dropped page
-                 cache. Both pools are read after 30 s idle. Nothing on
-                 either GB10 reloads after that in the session.
-              7. The Framework's arrangement. The Framework unloads
-                 everything and loads set A's 26B-A4B and E4B (capped,
-                 4 x 8,192) and granite (16 x 8,192), nothing else. After
-                 30 s idle, its GTT, system memory and each process (GTT,
-                 RSS) are read and set against the computed ~83.0 GiB
-                 GTT and ~87 GiB system memory available, along with
-                 every logged buffer. Its capped rows (idle, after each
-                 cell, highest) are set against footprint's uncapped
-                 Framework rows, the 26B-A4B's RSS growth among them.
-              8. Each Framework knee sweep records every level's output
-                 tok/s, TTFT, ITL and errors, and GuideLLM's knee. Each
-                 purpose is judged by its floor (vision <=10 s an image
-                 question, audio RTFx >=5, embedding >=4,300 prompt
-                 tok/s), with role-split's rule for "holds" and the same
-                 jq and awk readers.
-              9. Each mixed cell starts all of its GuideLLM processes
-                 together, each capped at 240 s, launched from each host's
-                 own step script. The baseline arm runs 4 processes, the
-                 Framework arm 7. In the Framework arm each capability
-                 purpose's streams split evenly between gb10-2 and the
-                 Framework. For each purpose and each host, the cell
-                 records the per-stream figures against the purpose's
-                 floor, and the purpose's combined holding against its
-                 load target. It also records each pool's lowest during
-                 the cell (both of the Framework's) and each process
-                 after it.
-             10. Every cell runs under watch, sampled every 10 s, capped
-                 at 10 min, and memory is read after every cell. A cell
-                 that falls under a floor is stopped and recorded as a
-                 finding.
-             11. The framework finding names every run (tool,
-                 configuration, load, duration, path, the decision it
-                 informs) and quotes every command behind a figure, and
+                 start: the architect applies the root updates on gb10-1,
+                 gb10-2 and the Framework. Each host's stack is recorded.
+                 Nothing else changes on gb10-2 or the Framework: no load,
+                 request, clone move or anchor. `tailscale ping` to
+                 gb10-1 is recorded with the date before every run, and
+                 the finding names each run's path.
+              2. A pull request to spike-model-engines' host/ moves vLLM
+                 to v0.33.0 and adds two agent rows. Each row serves
+                 openai/gpt-oss-120b with max-model-len 131072,
+                 max-num-seqs 16, the openai_gptoss reasoning parser,
+                 auto tool choice and the openai tool-call parser:
+                 - gpt-oss-120b-agent: gpu-memory-utilization 0.80, KV
+                   in the checkpoint's BF16;
+                 - gpt-oss-120b-agent-fp8: kv-cache-dtype fp8 (e4m3),
+                   kv-cache-memory-bytes 32993476982.
+                 Neither row names an attention or MoE backend. The pin's
+                 hold comment is rewritten: the v0.33.0 tag and images
+                 are rc3's commit, and currency keeps reporting rc3 until
+                 GitHub's release object moves. llama.env's hold note
+                 reads "unrestored through b12271". The PR reaches gb10-1
+                 before merge by a push to hosts-next and a local `hosts`
+                 branch there. gb10-2's and the Framework's clones stay
+                 on main at 21b5e8c. The check passes in both
+                 repositories.
+              3. Before any start or cell, gb10-1 holds vLLM's v0.33.0
+                 CUDA image and gpt-oss-120b's safetensors with every
+                 JSON file its start reads (original/*.safetensors and
+                 metal/ excluded). Both are staged in parallel. No vLLM
+                 start fetches a file, which the start log shows.
+              4. The step helpers read a vLLM container.
+                 - footprint prints the vllm container's GPU memory and
+                   RSS, and the start log's sizing lines: model loading
+                   and its time, available KV cache memory, KV cache
+                   tokens, maximum concurrency, CUDA graphs, the
+                   kv_cache_memory_bytes line, the startup free memory,
+                   and the attention and MoE backends chosen.
+                 - readout prints vLLM's /metrics counters: requests,
+                   prompt and generation tokens, preemptions, KV cache
+                   usage, and running and waiting requests. It also
+                   counts the server log's Harmony and output-parser
+                   errors since a time.
+                 - A llama.cpp host reads as before. watch and memory
+                   are unchanged. The check passes.
+              5. llama.cpp baseline. gb10-1 unloads everything, drops the
+                 page cache, and loads the agent-only section. The
+                 load's time is its cold start. After 30 s idle the pool,
+                 the process and the buffers are read and set against
+                 role-split's G (13.59 GiB available). Its S-agent sweep
+                 then runs.
+              6. The BF16 row on vLLM. The llama container stops, and
+                 vLLM installs serving gpt-oss-120b-agent. This first
+                 start fills the compile cache and is recorded apart.
+                 The page cache is dropped, and the container's
+                 restart is timed from its start to "Application startup
+                 complete." and /health 200. That timed start is the
+                 row's cold start. /version reads 0.33.0. After one
+                 warm-up request and 30 s idle, the pool and footprint
+                 are read: weights, KV memory and tokens, graphs,
+                 backends. They are set against v0.32.0's 25.71 GiB and
+                 493,523 tokens, read as a record across versions.
+              7. Anchors A and B run once each on the BF16 row. Their
+                 output tok/s and ITL are read against vLLM v0.32.0's
+                 34.0 and 86.7 tok/s (spike-model-engines'
+                 bench-gb10-container) as a record, not a gate; the
+                 row's 131,072 max-model-len is noted beside them.
+                 A move beyond the two runs' difference is a finding.
+              8. Each vLLM row answers the vLLM API page's reasoning
+                 probe and tool-call probe once, with the reply and its
+                 parse recorded. For every cell on a vLLM row, the cell
+                 records the server log's Harmony and output-parser
+                 errors and GuideLLM's errored count.
+              9. S-agent runs unchanged on llama.cpp's agent-only
+                 section, the BF16 row and the FP8 row: knee levels
+                 [1,4,8,12,16], 110 s each, the 4-turn sessions. Each
+                 level records output tok/s, TTFT, ITL (median, p95),
+                 turns ok, errored and incomplete, and GuideLLM's knee.
+                 Each level is judged by the agent floor (ITL ≤100 ms)
+                 under role-split's rule for "holds". The three are
+                 compared at the target of 4 and at every level.
+             10. The capacity cell runs once on each vLLM row: 8
+                 concurrent sessions, each one request of 65,536 prompt
+                 tokens and exactly 256 out, 524,288 tokens in all,
+                 capped at 10 min. It records:
+                 - per-request TTFT, latency and completion;
+                 - preemptions;
+                 - the highest KV cache usage and waiting count from
+                   readouts every 30 s;
+                 - the pool's lowest.
+                 It answers whether each row holds all 8 at once.
+             11. The FP8 row. The page cache is dropped, and vLLM
+                 updates to gpt-oss-120b-agent-fp8. Its one start, which
+                 compiles afresh, is its cold start, and its weight load
+                 is set against the BF16 row's. After a warm-up request
+                 and 30 s idle, footprint and memory are read. If
+                 gb10-1 reads under 12.2 GiB, the container is
+                 stopped and the session escalates, with 28 GiB
+                 (30064771072 bytes) prepared as the fallback. The start
+                 log names the attention backend, and the finding records
+                 it.
+             12. Every cell runs under watch with gb10-1's floor of
+                 12.2 GiB, sampled every 10 s and capped at 10 min. A
+                 cell that falls under the floor is stopped and recorded
+                 as a finding. Memory and footprint are read after every
+                 cell.
+             13. The agent-vllm finding names every run: tool,
+                 configuration, load, duration, path, and the decision it
+                 informs. It quotes every command behind a figure, and
                  every command that changes a host, from the step log.
-                 It answers evidence 5: what the Framework holds per
-                 purpose as a capability host, and what the split plus
-                 the Framework holds at the load targets and at the held
-                 levels against the baseline from this session, with
-                 memory left on each host. It adds the Framework's
-                 per-purpose rows to evidence 3, and its capped capacity
-                 rows, marked measured. It closes footprint's open items
-                 on the Framework's prompt cache and system-memory floor,
-                 and the 26B-A4B on Vulkan past 4 slots: untested,
-                 because the fix (#25584) is in no build and more slots
-                 add no vision throughput (role-split L.1). The living
-                 layout document's hosts and sizing gain the Framework's
-                 role and figures.
-             12. At the session's end gb10-1 serves the agent-only
-                 section; gb10-2 its 16-slot 26B-A4B, 16-slot E4B and
-                 granite; the Framework set A's capped 26B-A4B, E4B and
-                 granite, with gpt-oss unloaded. All three clones are on
-                 main at 21b5e8c.
-Test seams    Each host's router API (/health, /models, load and unload),
-              driven by the step helpers one step at a time; the memory,
-              footprint and watch read-outs (both pools on the Framework)
-              and the router's load log, with the step log as their
-              record; GuideLLM's result files for every cell, the knee
-              conclusion among them.
-Slices        1. Hosts, helpers and the baseline. The architect applies
-                 the root updates on all three hosts. Move the Framework's
-                 clone to 21b5e8c and restart its router; clear its store
-                 extras; make watch and memory read both of the
-                 Framework's pools, stopping under either floor. Then,
-                 each cell GuideLLM 0.8.1 from the laptop, run by `cell`
-                 under watch:
-                   FA/FB anchors A and B (`anchor-a`, `anchor-b`) on the
-                      Framework, each on a fresh set-a load alone, ~3.5
-                      min in all: whether the Framework's speed held
-                      since the hosts task
-                 gb10-1 and gb10-2 reload the split fresh (Behavior 6),
-                 idle 30 s, read. Then:
-                   B-target the split at the load targets, 240 s, ~5
-                      min: gb10-1 agent 4 (`role-split-mixed-agent`,
-                      agent-only); gb10-2 vision 4, audio 4, embedding 16
-                      (`role-split-mixed-vision`, `-audio`, `-embed`,
-                      its 16-slot sections and granite): what one
-                      capability host gives at the targets this session
-                   B-held the split at role-split's held levels, 240 s,
-                      ~5 min: gb10-1 agent 4; gb10-2 vision 1, audio 1,
-                      embedding 16: the baseline the second capability
-                      host is set against
-                 Demo: the Framework's anchors against R3/R4, a Framework
-                 cell's watch showing both pools, and B-target and
-                 B-held per purpose.
-              2. The Framework as a second capability host. The Framework
-                 unloads everything, loads the capped 26B-A4B, E4B and
-                 granite, idles 30 s, and is read. gb10-1 and gb10-2 stay
-                 as slice 1 left them. Then:
-                   X-vision the Framework's 26B-A4B
-                      (`role-split-vision-full`), knee [1,2,3,4,8], 60 s
-                      a level, one 1440p JPEG + 200 text tokens, 100 out,
-                      ~5.5 min: vision requests the Framework holds
-                   X-audio the Framework's E4B (`role-split-audio-full`),
-                      knee [1,2,3,4,8], 30 s a level, at most 64 requests
-                      a level, the 73 LibriSpeech clips, ~3 min: audio
-                      requests the Framework holds
-                   X-embed the Framework's granite (`role-split-embed`),
-                      concurrent [1,2,4,8,16], 30 s each, 512-token
-                      inputs, ~3 min: embedding throughput against its
-                      floor
-                   P-target the split plus the Framework at the load
-                      targets, 240 s, ~5 min: gb10-1 agent 4; vision 2 on
-                      gb10-2 + 2 on the Framework; audio 2 + 2; embedding
-                      8 + 8: whether two capability hosts reach the
-                      targets
-                   P-held the split plus the Framework at the held
-                      levels, 240 s, ~5 min: gb10-1 agent 4; vision 1 +
-                      1; audio 1 + 1; embedding 8 + 8: whether a second
-                      host doubles what one held
-                 All three hosts end serving as Behavior 12 states.
-                 Demo: the Framework's held levels per purpose, and
-                 P-target and P-held against B-target and B-held.
-              3. The finding and docs. Write the framework finding:
-                 evidence 5's comparison, the Framework's per-purpose
-                 rows for evidence 3, its capped capacity rows marked
-                 measured, the closed footprint items, every run with
-                 its path, and the commands quoted. Update the layout
-                 document's hosts and sizing.
+                 It answers evidence 6: per engine and row, speed and
+                 ITL at the target and per level, TTFT under multi-turn
+                 load, memory and the margin above the floor, KV tokens
+                 per GiB, 131,072-token sessions per host (the capacity
+                 cell measured, the rest computed and marked), cold
+                 start, and errors. It records the FP8 row's backend,
+                 probes and error counts. The living layout document
+                 gains vLLM's agent rows beside llama.cpp's.
+             14. At the session's end gb10-1 serves the agent-only
+                 section, freshly loaded and read. The vllm container
+                 is stopped on the FP8 row, with vLLM's v0.33.0 image,
+                 the compile cache and gpt-oss's safetensors kept.
+                 gb10-1's clone is on `hosts` at the PR's head until the
+                 merge, then on main. gb10-2 and the Framework serve as
+                 the framework task left them.
+Test seams    gb10-1's router API on 8080 (/health, /models, load and
+              unload) and vLLM's API on 8000 (/health, /version,
+              /v1/models, /metrics), driven by the step helpers one step
+              at a time. The vllm container's state and start log. The
+              memory, footprint, readout and watch read-outs, with the
+              step log as their record. GuideLLM's result files for
+              every cell, the knee conclusion among them.
+Slices        1. Hosts, the pull request, the helpers and the llama.cpp
+                 baseline.
+                 - The architect applies the root updates on all three
+                   hosts.
+                 - Write the host/ PR branch and push it to gb10-1's
+                   hosts-next. Its clone moves to the local `hosts`
+                   branch.
+                 - Stage the image and the weights in parallel.
+                 - Make footprint and readout read a vllm container.
+                 - Write the capacity cell's file,
+                   `bench/agent-vllm-capacity.yaml`, adapted from
+                   footprint-p1 (8 streams, 1 request each, 65,536 in,
+                   256 out).
+                 Then on gb10-1 (source measure-lib.sh gb10-1),
+                 `unload --all`, drop the cache, `load
+                 gpt-oss-120b-MXFP4-agent-only`, idle 30 s, read. Then:
+                   L-agent  S-agent (`role-split-agent-split`) on the
+                      agent-only section, [1,4,8,12,16], 110 s a level,
+                      ~9.5 min: llama.cpp's figures this session
+                 Demo: the PR's two rows on gb10-1's hosts branch, the
+                 baseline's idle read against role-split G, L-agent's
+                 table, and footprint printing an llama-server row.
+              2. vLLM's two rows. The session runs `docker stop llama`,
+                 then `VLLM_MODEL=gpt-oss-120b-agent host/engines vllm
+                 install` (first start, recorded apart). It drops the
+                 cache, restarts the container (timed start), warms up,
+                 idles 30 s and reads. From here the helpers are sourced
+                 for port 8000. Then, each cell GuideLLM 0.8.1 from the
+                 laptop, run by `cell` under watch:
+                   VA/VB  anchors A and B (`anchor-a`, `anchor-b`) on
+                      the BF16 row, ~3 min in all: v0.33.0 against
+                      v0.32.0's 34.0 and 86.7
+                   probes  reasoning and tool call, <1 min
+                   B-agent  S-agent on the BF16 row, ~9.5 min
+                   B-cap  the capacity cell on the BF16 row
+                      (`agent-vllm-capacity`), readouts every 30 s,
+                      ~7.5 min (c), cap 10 min: whether 8 long
+                      sessions fit in ~494k tokens
+                 Drop the cache, `VLLM_MODEL=gpt-oss-120b-agent-fp8
+                 host/engines vllm update` (its one start, timed), warm
+                 up, idle 30 s, read. Under the floor: stop and escalate.
+                 Then:
+                   probes  reasoning and tool call, <1 min
+                   F-agent  S-agent on the FP8 row, ~9.5 min
+                   F-cap  the capacity cell on the FP8 row, as B-cap:
+                      whether all 8 run at once in ~1.18M tokens
+                 `docker stop vllm`, `docker start llama`, `load
+                 gpt-oss-120b-MXFP4-agent-only`, idle 30 s, read
+                 (Behavior 14). About 1 h 50 min on the host (c).
+                 Demo: each row's start log and idle read against the
+                 floor, VA/VB against v0.32.0, and L-agent, B-agent and
+                 F-agent at 4 streams, with B-cap set against F-cap.
+              3. The finding and docs. Write the agent-vllm finding:
+                 - evidence 6's comparison across the three;
+                 - the KV and session capacity rows, measured and
+                   computed, each marked;
+                 - cold starts, the backends, probes and error counts;
+                 - every run with its path, and the commands quoted.
+                 Update the layout document's agent rows.
                  Demo: the comparison table, and one placement read from
-                 it (combined vision holding against the target of 4).
-              4. The architect's walkthrough on the Framework: unload
-                 all and reload its three capability sections from the
-                 finding's commands, and read both pools and the
-                 processes against the finding; then rerun, as its own
-                 cell, one level of the Framework sweep for the purpose
-                 it holds least of, at that held level, ~5 min, and read
-                 it against the finding with both floors watched.
-Out of scope  Any new tool; any pull request to host/, including updating
-              llama.env's hold reason or the 16-slot section's "GB10
-              only" comment (pending edits); Gemma 4 26B-A4B or E4B past
-              4 slots on Vulkan; loading the 16-slot or agent-only
-              sections on the Framework; gpt-oss on the Framework beyond
-              the anchors (agent overflow stays computed); anchors on the
-              GB10s; sweeps on gb10-2; splits other than even; routing
-              (each process targets its host directly); granite's cache
-              keys; audio past 8,192 tokens a slot; adaptive knee
-              refinement; llama.cpp past b12098; vLLM, including the
-              Framework running gb10-2's capability workload and
-              configuration on vLLM, which agent-vllm takes up (pending
-              roadmap edit); on-demand loading; speed comparisons with
-              role-split's figures beyond citing them.
-Door          two-way: the clone move and router restart revert by
-              checking out 3260dd0 and restarting; the step-helper edit
-              reverts by commit; host changes are only router loads and
-              unloads, the clone's commit and a restart. The store
-              extras re-download from Hugging Face if a later task needs
-              them. No pull request, pin, image or preset changes. Root
-              is the architect's (the OS updates); the page-cache drop
-              uses the existing sudoers rule on the GB10s.
+                 it (131,072-token sessions per agent host on each row).
+              4. The architect's walkthrough on gb10-1: `docker stop
+                 llama`, `docker start vllm` (the FP8 row, warm compile
+                 cache), time the start, and read the start log's KV
+                 line and the pool against the finding. Then rerun
+                 S-agent's level 4 as its own cell (110 s) under watch
+                 against F-agent's, and restore llama.cpp as Behavior 14
+                 states, ~20 min.
+Out of scope  Any new tool, llama-swap among them. Vision, audio or
+              embedding on vLLM on any host (the new capability task).
+              Any load, request, clone move or anchor on gb10-2 or the
+              Framework. Anchors on llama.cpp or on the FP8 row. A
+              second timed start for the FP8 row. The capacity cell on
+              llama.cpp. Attention or MoE backend flags, speculative
+              decoding, MTP, NVFP4 or KV-scale calibration. Accuracy
+              evals beyond the two probes. An FP8 KV cache on llama.cpp.
+              Rows other than the two, or the 28 GiB fallback without
+              an escalation. llama.cpp past b12098. Changes outside
+              host/ in spike-model-engines, currency.sh among them (an
+              intake note). Routing (spike-model-gateway). Two-node and
+              Ray. Removing vLLM's image, container or weights. Speed
+              comparisons with earlier sessions beyond the anchors'
+              record and citing role-split.
+Door          two-way: the pin and rows revert by a commit to host/, and
+              before merge by checking gb10-1's clone out at main
+              21b5e8c. The helper edit and the bench file revert by
+              commit. vLLM's container, image, compile cache and weights
+              come off with `docker rm vllm`, `docker rmi` and `hf cache
+              rm`. llama.cpp's agent-only section returns with `docker
+              start llama` and a load. Root is the architect's (the OS
+              updates); the page-cache drop uses gb10-1's existing
+              sudoers rule. Nothing in the task can't be undone.
 ```
-
 
 ## Decisions
 
@@ -357,6 +395,37 @@ Door          two-way: the clone move and router restart revert by
 - framework (BUILD, escalation): the branch was rewritten before publishing so the hosts' LAN addresses, committed in the finding's first commit and removed by the standards review, never reach the public history: the removal folded into that commit with a non-interactive fixup rebase over origin/main, the tree unchanged (the architect).
 - framework: slice 4's walkthrough waived by the architect, as in hosts; `bench/framework-walk-vision.yaml` stays as the one-level cell for a later rerun (the architect).
 
+- agent-vllm: scope is gpt-oss-120b on vLLM v0.33.0 against llama.cpp's agent-only section, on gb10-1 alone; the capability models on vLLM become a new task placed next, and the two widening edits move into it; rejected: widening this task to the capability GB10 or to the Framework.
+- agent-vllm: the vLLM pin moves to v0.33.0 from its tag and images (the same commit as v0.33.0rc3), by a pull request to host/ that also rewrites the hold comment and carries llama.env's hold note through b12271; currency keeps reporting rc3 until GitHub's release object moves.
+- agent-vllm: the engines run one after the other on gb10-1 (llama.cpp's baseline, then vLLM's two rows, then llama.cpp restored); rejected: vLLM on gb10-2 beside llama.cpp on gb10-1.
+- agent-vllm: two vLLM rows are evaluated, not one discarded on paper: gpt-oss-120b-agent (BF16 KV, gpu-memory-utilization 0.80) and gpt-oss-120b-agent-fp8 (fp8 e4m3, kv-cache-memory-bytes 32993476982, 1,179,648 tokens computed), each max-model-len 131072, max-num-seqs 16, no backend named; an FP8 idle read under 12.2 GiB stops it and escalates, with 28 GiB as the fallback (the architect).
+- agent-vllm: role-split's S-agent sweep runs unchanged on llama.cpp and on both vLLM rows ([1,4,8,12,16], 110 s a level).
+- agent-vllm: a capacity cell (8 concurrent sessions, one 65,536-token request each, 256 out, cap 10 min) runs on both vLLM rows; rejected: running it on llama.cpp as well.
+- agent-vllm: anchors A and B run on the BF16 row only, read against v0.32.0's 34.0 and 86.7 tok/s as a record; none on llama.cpp (b12098 unchanged) or on the FP8 row.
+- agent-vllm: the reasoning and tool-call probes run once on each vLLM row, and every vLLM cell counts the server log's Harmony and parser errors, since the quantization floor doesn't cover KV precision and FP8 KV runs at scale 1.0.
+- agent-vllm: one cold start per engine: llama.cpp's load and vLLM's BF16 timed start from a dropped page cache (its first start recorded apart); the FP8 row's one start, which compiles afresh because the KV dtype is part of vLLM's compile hash.
+- agent-vllm: no new tool and no llama-swap: routing above the engine layer is spike-model-gateway's, the goal after layout (the architect).
+- agent-vllm: measure-lib's footprint and readout read a vllm container (GPU memory, RSS, start-log sizing and backends, /metrics, Harmony and parser errors); an edit to the step helpers, not a new tool.
+- agent-vllm: one session in the order hosts and staging, llama.cpp baseline, BF16 row, FP8 row, llama.cpp restored, about 1 h 50 min on the host (c); rejected: the vLLM rows in a second session.
+- agent-vllm: the session ends with gb10-1 serving llama.cpp's agent-only section and the vllm container stopped on the FP8 row, its image, compile cache and gpt-oss weights kept for two-node.
+- agent-vllm: the walkthrough starts the stopped FP8 row, reads its KV line and the pool against the finding, reruns S-agent's level 4 as its own cell, and restores llama.cpp.
+- agent-vllm: all three hosts take their pending OS updates (the architect), and only gb10-1 is measured or changed.
+- agent-vllm (BUILD): the FP8 row keeps `--gpu-memory-utilization 0.80` beside its byte size: the 0.80 still gates vLLM's startup free-memory check, and the bytes size the cache (v0.33.0 source, `vllm/v1/worker/utils.py`, `gpu_worker.py`).
+- agent-vllm (BUILD): the capacity file carries `max_duration` 570 s, so a slow cell still writes its JSON under `cell`'s 10 min cap.
+- agent-vllm (BUILD): the step helpers choose the engine by port (8000 reads vLLM, any other llama.cpp), and `MEASURE_ENGINE` overrides the choice; vLLM's `footprint` reads the start log since the container's current start.
+- agent-vllm (BUILD): idle reads drop the page cache first, as slice 1's baseline did; each vLLM start is timed on gb10-1's clock to "Application startup complete."; MemAvailable is sampled every 10 s during each start.
+- agent-vllm (BUILD): the premise changed: v0.33.0's BF16 cache held 846,411 tokens, not ~494,000, so the capacity cell didn't force BF16 to queue; the FP8 row held 1,733,910 tokens, not the computed 1,179,648. Both are reported as found, not rerun.
+- agent-vllm (BUILD): "meets the floor through" (llama.cpp 4, BF16 8, FP8 12) and "holds" by role-split's rule (4, 4, 12) are reported side by side.
+- agent-vllm (BUILD): `bench/capacity.jq` and `bench/readouts.awk` are tracked readers for the capacity cell, analysis files and not a new tool; the standards review made them report data they can't read instead of reading it as 0.
+- agent-vllm (BUILD): the FP8 row's byte size is reproduced by a quoted awk command (half the mean of v0.32.0's two logged accountings, times 1,179,648), in place of the planner's unquoted scratch computation.
+- agent-vllm (BUILD): v0.32.0's start and load times stand beside v0.33.0's as a record across versions, not a comparison.
+- agent-vllm (BUILD): every vLLM start contacted the Hugging Face hub for metadata and downloaded no model file; the finding records it, and Behavior 3 holds for files.
+- agent-vllm (BUILD): the comment wording in host/vllm-rows stays as is, so the pull request's head stays at c5251be, which gb10-1 runs and the finding cites.
+- agent-vllm (BUILD): for the agent, a longer cold start is accepted in exchange for better concurrency and overall performance (the architect).
+- agent-vllm (BUILD): vLLM is the more attractive engine for the agent, chiefly for its concurrency (the architect).
+- agent-vllm (BUILD): the finding's conclusion is framed as evidence: vLLM is the stronger agent engine on gb10-1, the FP8 row leads the BF16 row if its output quality matches, and FP8's uncalibrated KV cache is the one open item (the architect).
+- agent-vllm: the architect's walkthrough reproduced the FP8 row's sizing (1,733,910 tokens) and its level 4 (ITL 49.85 against 49.55 ms; every-token 74.28 against 74.38 tok/s); its pool read (15.19 GiB) came straight after the start, without the finding's warm-up, idle and cache drop, and is recorded as that, not isolated (docs/findings/agent-vllm.md, L.4).
+
 ## Pending edits
 
 - coordinator · ai-hosting.md "Hosts and access": the drop-caches rule on both GB10s.
@@ -378,3 +447,14 @@ Door          two-way: the clone move and router restart revert by
 - spike-model-engines · intake note: the preset's `gemma-4-26B-A4B-it-qat-Q4_0-16-slots` comment (host/llama-preset/models.ini:217, "GB10 only: on Vulkan (the Framework) the section aborts past 4 slots") is broader than measured: aborts were at 16 x 131,072 (#29082) and 15 x 131,072 (#29221); 4 x 8,192 runs; 5-14 slots and 16 x 8,192 never ran on Vulkan; #29221's report crashes at -np 4 with 262,144-token slots; the E4B past 4 slots never ran on Vulkan either. The framework task left both untested, since the fix (#25584) is in no build and more slots add no vision throughput (spike-model-layout `docs/findings/framework.md`, K.4).
 - coordinator · intake note (ai-hosting.md, experiment.hosting, "Gaps in the answer"): on the Framework, vision and audio each met their floor alone at 1 stream (6.82 s; RTFx 8.81) and missed beside each other and embedding (11.94 s; RTFx 4.03) with 82.27 GiB of GTT and at least 84.41 GiB of system memory free; on gb10-2 they missed together at 1 stream with 69 GiB free. The finding reads the purposes' sharing of one GPU's compute and bandwidth, not memory capacity, as what holds them under their floors; no cell isolated it. Two capability hosts held 0 of 4 vision and 0 of 4 audio streams at the load target, and at most 2 vision requests with nothing else running (spike-model-layout `docs/findings/framework.md`, F, J, L.1).
 - coordinator · intake note (ai-hosting.md, experiment.hosting, the host descriptors' load targets): gb10-1's agent-only section (c 1,179,648 over 16 slots) met the agent's 4-session target in every cell but ran 0.30 to 0.36 GiB above its 12.2 GiB floor at its lowest, after role-split's 0.27 GiB (spike-model-layout `docs/findings/framework.md`, H, L.5).
+- coordinator · roadmap.toml, experiment.hosting.spike-model-layout: a new task after agent-vllm and before on-demand puts the capability models on vLLM in containers: vision (Gemma 4 26B-A4B), audio (E4B) and embedding (granite), each in its own process, alone and together, on the capability GB10 and on the Framework (vLLM ROCm), against llama.cpp. It carries these notes: the official ROCm image shipped no audio decoder at v0.32.0, and the audio-extra probe image covered that (spike-model-engines context/README.md:287-288); v0.33.0's default ROCm image is ROCm 10.0, with `-rocm72` beside it; and the suite runs one `vllm` container on port 8000. This edit replaces the two agent-vllm widening edits above. agent-vllm's summary becomes gpt-oss-120b on vLLM v0.33.0 in two rows (BF16 KV at 0.80; FP8 KV sized to 1,179,648 tokens) against llama.cpp's agent-only section on gb10-1. context/README.md's Path and its Capabilities line change to match (the architect, agent-vllm plan round).
+  - #58868, the GB10 weight-loading fix, is in v0.34.0rc0 and not v0.33.0, and doesn't reach ROCm: only vLLM's CUDA platform implements `is_integrated_gpu` (spike-model-layout `docs/findings/agent-vllm.md`, C, N).
+  - #49991, its ROCm counterpart (`VLLM_ROCM_CLONE_MMAP_WEIGHTS`), is open and stalled.
+  - No upstream issue targets vLLM's startup on gfx1151.
+  - The task measures the Framework's vLLM load time, which this spike hasn't.
+  - The agent row's cold start is remeasured on v0.34.0 once it is final, for on-demand or two-node.
+- spike-model-engines · intake note: `scripts/currency.sh` compares `VLLM_RELEASE` with GitHub's latest release, which is still named v0.33.0rc3, though the v0.33.0 tag and Docker images are the same commit; currency reports the pin against rc3 until GitHub publishes a v0.33.0 release. The fix is outside host/.
+- spike-model-engines · intake note (housekeeping): agent-vllm's pull request to host/ carries llama.env's hold note through b12271, which supersedes the b12211 -> b12242 note above; drop that note once the pull request merges.
+- coordinator · intake note (ai-hosting.md, experiment.hosting): for the agent, the architect accepts a longer cold start in exchange for better concurrency and overall performance, and finds vLLM the more attractive agent engine, chiefly for its concurrency (spike-model-layout `docs/findings/agent-vllm.md`, the conclusion and N).
+- spike-model-engines · intake note: `docs/engines/vllm/models.md` and `docs/engines/vllm/api.md` (outside host/) still describe v0.32.0 and list neither the `gpt-oss-120b-agent` nor the `gpt-oss-120b-agent-fp8` row (spike-model-layout `docs/findings/agent-vllm.md`, N).
+- coordinator · intake note (ai-hosting.md, experiment.hosting): gpt-oss-120b's FP8 KV cache on vLLM runs uncalibrated at scale 1.0, and an accuracy check of the FP8 row against the BF16 row would settle the agent row. That check is a new tool, so it belongs to a future task's plan round (spike-model-layout `docs/findings/agent-vllm.md`, E, N).

@@ -11,6 +11,10 @@ the target in `GUIDELLM__SPEC__BACKEND__TARGET`. Each file's header gives its lo
   ([`docs/findings/footprint.md`](../docs/findings/footprint.md)).
 - `role-split-*.yaml`: the role-split task's cells, below, which the framework task's cells reuse
   unchanged.
+- `agent-vllm-capacity.yaml`: the agent-vllm task's capacity cell, B-cap and F-cap: 8 streams of
+  one request each, 65,536 prompt tokens and 256 out, on each of vLLM's agent rows, run with the
+  helpers sourced for port 8000 and `MEASURE_READOUT_EVERY=30` (the agent-vllm finding,
+  [`docs/findings/agent-vllm.md`](../docs/findings/agent-vllm.md)).
 
 ## Role-split's cells
 
@@ -129,6 +133,23 @@ verdict. With `--arg purpose client`, it prints GuideLLM's own per-request timin
 instead (`--argjson level <i>`, default the first): the gap between requests, the time from
 request start to the first streamed chunk, the streaming time, and the audio bytes. Medians and
 percentiles interpolate linearly between the two nearest ranks.
+
+## Reading the capacity cell: `capacity.jq` and `readouts.awk`
+
+[`capacity.jq`](capacity.jq) reads the capacity cell's JSON (`agent-vllm-capacity.yaml`) a
+request at a time, where `levels.jq` gives only the level's medians. In order of start, it prints
+each request's status, start from the first's, TTFT, latency, prompt tokens, and output tokens
+against the scenario's 256, then the counts, the TTFT and latency medians and extremes, and the
+spread of the starts. [`readouts.awk`](readouts.awk) reads the readouts `watch` printed every 30 s
+(a step's output, or the measure log's lines for the cell). It prints the highest running, waiting
+and KV cache usage, and the preemptions between the first and last counters line, since vLLM
+counts preemptions from its start. A line with a figure the server didn't report (`-`) counts
+apart, never as 0.
+
+```sh
+jq -r -f bench/capacity.jq .state/measure/gb10-1/agent-vllm-b-cap.json
+awk -f bench/readouts.awk .state/agent-vllm/b-cap.out
+```
 
 ## Reading the router log: `srvtimes.awk`
 

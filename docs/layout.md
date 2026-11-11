@@ -10,8 +10,8 @@ left loaded, not a layout decision.
 
 | Host | Stack | Engine and preset | Serves now | Parity | Finding |
 | --- | --- | --- | --- | --- | --- |
-| gb10-1 | DGX OS 7.6.0, kernel 7.0.0-1025-nvidia, driver 580.178.04, CUDA 13.0, Docker 29.6.2 | llama.cpp `server-cuda13-b12098`, spike-model-engines' shared preset on `main` at 21b5e8c (role-split's change, 2d7ae32, merged) | `gpt-oss-120b-MXFP4-agent-only` (c 1,179,648 over 16 slots, unified): the agent | the reference GB10 | [hosts](findings/hosts.md): stack, sections A, B, D, E; [role-split](findings/role-split.md): stack, A, G; [framework](findings/framework.md): stack, D |
-| gb10-2 | as gb10-1 | as gb10-1 | `gemma-4-26B-A4B-it-qat-Q4_0-16-slots`, `gemma-4-E4B-it-Q8_0-16-slots` (16 slots of 8,192 each, prompt cache capped), granite-embedding: vision, audio and embedding | within run noise of gb10-1 on anchors A and B (means: A −1.37%, B −0.99% output tok/s); rechecked in role-split: A −0.85%, B −1.17% on B's repeat; cells compare across the two GB10s | [hosts](findings/hosts.md): stack, sections A, B, D, E; [role-split](findings/role-split.md): stack, A, B, G; [framework](findings/framework.md): stack, D |
+| gb10-1 | DGX OS 7.6.0, kernel 7.0.0-1025-nvidia, driver 580.178.04, CUDA 13.0, Docker 29.6.2 | llama.cpp `server-cuda13-b12098`, spike-model-engines' shared preset (role-split's change, 2d7ae32, merged); its clone on a local `hosts` branch at c5251be, agent-vllm's `host/` change before merge: vLLM v0.33.0 (`vllm/vllm-openai:v0.33.0`) and the rows `gpt-oss-120b-agent` and `gpt-oss-120b-agent-fp8`, the `vllm` container stopped on the FP8 row | `gpt-oss-120b-MXFP4-agent-only` (c 1,179,648 over 16 slots, unified): the agent | the reference GB10 | [hosts](findings/hosts.md): stack, sections A, B, D, E; [role-split](findings/role-split.md): stack, A, G; [framework](findings/framework.md): stack, D; [agent-vllm](findings/agent-vllm.md): stack, A, C |
+| gb10-2 | as gb10-1 | llama.cpp `server-cuda13-b12098`, the shared preset on `main` at 21b5e8c; no vLLM image or row | `gemma-4-26B-A4B-it-qat-Q4_0-16-slots`, `gemma-4-E4B-it-Q8_0-16-slots` (16 slots of 8,192 each, prompt cache capped), granite-embedding: vision, audio and embedding | within run noise of gb10-1 on anchors A and B (means: A −1.37%, B −0.99% output tok/s); rechecked in role-split: A −0.85%, B −1.17% on B's repeat; cells compare across the two GB10s | [hosts](findings/hosts.md): stack, sections A, B, D, E; [role-split](findings/role-split.md): stack, A, B, G; [framework](findings/framework.md): stack, D |
 | framework | Omarchy, kernel 7.2.15-1-omarchy, Mesa and vulkan-radeon 26.2.5, linux-firmware 20260916, Docker 29.9.2 | llama.cpp `server-vulkan-b12098` (moved from b11960, no regression), the shared preset on `main` at 21b5e8c | set A's `google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0` and `ggml-org/gemma-4-E4B-it-GGUF:Q8_0` (4 slots of 8,192 each, prompt cache capped) and granite-embedding (16 slots of 8,192): a second capability host beside gb10-2, serving vision, audio and embedding; gpt-oss unloaded | not compared with the GB10s; anchors against its own R3 and R4: A +1.07%, B +2.46% output tok/s, within its across-days 2.8% | [hosts](findings/hosts.md): stack, sections A, B, C; [footprint](findings/footprint.md): C, G, I; [framework](findings/framework.md): stack, A, C, E |
 
 ### Roles measured on the GB10s
@@ -56,6 +56,29 @@ RTFx 4.03), with over 80 GiB free on both of the Framework's pools (framework fi
 L.1). Two capability hosts hold at most 2 vision requests with nothing else running, against a
 load target of 4.
 
+### The agent on vLLM beside llama.cpp
+
+The [agent-vllm finding](findings/agent-vllm.md) measured gpt-oss-120b alone on gb10-1, on
+llama.cpp's agent-only section and on two vLLM v0.33.0 rows in a container, each at 131,072 tokens
+a sequence and 16 sequences, one engine at a time in one session (sections C, F, H and I). Every
+measuring run went direct on the LAN, so these are LAN figures. "Meets the floor through" is the
+highest level of role-split's S-agent sweep with ITL median ≤100 ms. Under role-split's rule for
+"holds", llama.cpp holds 4, the BF16 row 4 (its knee is 6.71) and the FP8 row 12 (finding, F).
+
+| Engine and row | At the target of 4: output tok/s, ITL, TTFT | Meets the floor through | 1 stream: tok/s, ITL | KV tokens; 131,072-token sessions (c) | 8 × 65,603-token requests at once | Pool idle / lowest under load (floor 12.2 GiB) | Cold start |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| llama.cpp `gpt-oss-120b-MXFP4-agent-only` (c 1,179,648 over 16 slots, f16 KV) | 55.85; 54.44 ms; 2,258 ms | 4 sessions | 37.24; 20.07 ms | 1,179,648; 9 | not run | 13.66 / 12.59 GiB | 48.4 s |
+| vLLM `gpt-oss-120b-agent` (BF16 KV, gpu-memory-utilization 0.80) | 55.85; 50.03 ms; 574 ms | 8 sessions | 27.93; 29.65 ms | 846,411 (725,243 on a compiling start); 6 | held, no preemption, KV 57.1% | 15.88 / 15.46 GiB | 503.1 s |
+| vLLM `gpt-oss-120b-agent-fp8` (fp8 e4m3 KV, 32,993,476,982 bytes, uncalibrated) | 65.16; 49.55 ms; 566 ms | 12 sessions | 32.58; 28.97 ms | 1,733,910; 13 | held, no preemption, KV 27.0% | 13.88 / 13.92 GiB (12.52 during its start) | 530.7 s |
+
+On these figures vLLM is the stronger agent engine on gb10-1, and the FP8 row leads the BF16 row
+if its output quality matches BF16's, which only the two probes and the error counts checked; an
+accuracy check is the open item (finding, N). The architect accepts vLLM's longer cold start for a
+resident agent in exchange for its concurrency (the architect's preference, finding summary).
+v0.33.0 counts about 38,058 bytes of KV a token in BF16 and 19,028 in FP8 (c), against v0.32.0's
+55,936 (c), so v0.32.0's 493,523-token BF16 cache and the 1,179,648 tokens computed for the FP8
+row's bytes don't describe v0.33.0 (finding, I.2).
+
 ## Sizing
 
 Every placement is sized from the capacity table in the
@@ -76,9 +99,12 @@ GTT and system-memory pools. The footprint table's computed figures assume the G
 held a GB10's floor under vision load (role-split, section C) and the Framework's system memory
 stayed above its own floor (framework, K.4). The Framework's 26B-A4B stays at 4 slots: past 4 on
 Vulkan it is untested, since the fix (#25584) is in no build and more slots add no vision
-throughput (framework, K.4).
+throughput (framework, K.4). The [agent-vllm finding](findings/agent-vllm.md), section I, adds
+the agent's rows on vLLM v0.33.0: 66.14 GiB of weights; KV bytes a token, tokens per GiB and
+131,072-token sessions for BF16 and FP8 KV beside llama.cpp's f16; each row's idle and lowest pool;
+and the capacity cell's 8 concurrent 65,603-token requests, held on both rows.
 
 | Host class | Set A idle | Set A warmed peak | Floor | Worked placement | Finding |
 | --- | --- | --- | --- | --- | --- |
-| GB10 | 21.45 GiB available (21.57 with the Gemma cap) | 17.23 GiB (with the cap, lowest under the full set's mixed load: 15.86 GiB) | 12.2 GiB | agent-only: 9 sessions of 131,072 tokens computed; loaded as c 1,179,648 over 16 slots, 1.39 GiB above the floor idle, 0.27 GiB at its lowest in role-split and 0.30 GiB in the framework task, holding 4 sessions of the 4-turn shape | [footprint](findings/footprint.md): I.3, I.7; [role-split](findings/role-split.md): G, I, K; [framework](findings/framework.md): D, H |
+| GB10 | 21.45 GiB available (21.57 with the Gemma cap) | 17.23 GiB (with the cap, lowest under the full set's mixed load: 15.86 GiB) | 12.2 GiB | agent-only: 9 sessions of 131,072 tokens computed; loaded as c 1,179,648 over 16 slots, 1.39 GiB above the floor idle, 0.27 GiB at its lowest in role-split and 0.30 GiB in the framework task, holding 4 sessions of the 4-turn shape; on vLLM v0.33.0 (agent-vllm), BF16 KV at 0.80: 846,411 tokens, 6 sessions computed, 3.68 GiB above the floor idle, 3.26 at its lowest, meeting the floor through 8 sessions; FP8 KV at 32,993,476,982 bytes: 1,733,910 tokens, 13 sessions computed, 1.68 GiB above the floor idle, 1.72 at its lowest under load and 0.32 during its start, meeting the floor through 12 | [footprint](findings/footprint.md): I.3, I.7; [role-split](findings/role-split.md): G, I, K; [framework](findings/framework.md): D, H; [agent-vllm](findings/agent-vllm.md): C, F, I |
 | Framework | 19.08 GiB available (GTT) | 18.08 GiB | 11.2 GiB GTT; 12.5 GiB system memory | capability host, measured: capped 26B-A4B and E4B (4 × 8,192) and granite (16 × 8,192), 83.00 GiB GTT and 87.13 GiB system memory available idle, 82.27 and 84.25 GiB at their lowest; holds vision 1, audio 2, embedding 16 alone | [footprint](findings/footprint.md): I.3; [framework](findings/framework.md): E, F, K |
