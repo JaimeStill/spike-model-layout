@@ -260,7 +260,7 @@ Door          two-way: the pin and rows revert by a commit to host/, and
 
 ## Progress
 
-slices 2/4 committed · standards — · spec — · editor —
+slices 3/4 committed (4 is the architect's walkthrough) · standards — · spec — · editor —
 
 ## Decisions
 
