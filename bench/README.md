@@ -14,7 +14,7 @@ the target in `GUIDELLM__SPEC__BACKEND__TARGET`. Each file's header gives its lo
 - `agent-vllm-capacity.yaml`: the agent-vllm task's capacity cell, B-cap and F-cap: 8 streams of
   one request each, 65,536 prompt tokens and 256 out, on each of vLLM's agent rows, run with the
   helpers sourced for port 8000 and `MEASURE_READOUT_EVERY=30` (the agent-vllm finding,
-  `docs/findings/agent-vllm.md`).
+  [`docs/findings/agent-vllm.md`](../docs/findings/agent-vllm.md)).
 
 ## Role-split's cells
 

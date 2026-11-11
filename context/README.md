@@ -85,7 +85,8 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
   [`docs/findings/role-split.md`](../docs/findings/role-split.md).
 - **The Framework's placement** in the layout, as a second capability host beside gb10-2 serving
   vision, audio and embedding, [`docs/findings/framework.md`](../docs/findings/framework.md).
-- **The vLLM agent comparison** against llama.cpp.
+- **The vLLM agent comparison** against llama.cpp on gb10-1,
+  [`docs/findings/agent-vllm.md`](../docs/findings/agent-vllm.md).
 - **On-demand serving** through llama.cpp's router.
 - **Two-node serving** over QSFP with vLLM and Ray.
 - **The layout document:** [`docs/layout.md`](../docs/layout.md), living, finalized by the answer.
