@@ -1,0 +1,27 @@
+# agent-vllm's capacity cell, B-cap and F-cap: gpt-oss-120b on one of vLLM's agent rows
+# (gpt-oss-120b-agent, BF16 KV, or gpt-oss-120b-agent-fp8), 8 concurrent streams, each sending
+# exactly 1 request of 65,536 synthetic prompt tokens and exactly 256 output tokens, 8 requests and
+# 524,288 prompt tokens in all: whether the row's KV cache holds 8 long sessions at once, read from
+# vLLM's running, waiting and preemption counts in the readouts. Adapted from footprint-p1.yaml, at
+# 8 streams, 65,536 tokens and 8 requests. Engine-neutral: the model and its tokenizer
+# (openai/gpt-oss-120b both, the name vLLM serves the row by) are given on the command line, as
+# `cell`'s <section> <tokenizer>, the JSON's path by `cell`, and the target in
+# GUIDELLM__SPEC__BACKEND__TARGET. A row must give a sequence more than 65,792 tokens and the
+# model's chat template. GuideLLM sends max_completion_tokens with ignore_eos whenever
+# output_tokens is set, so every request generates its full 256. The cap is `cell`'s, 10 min
+# (MEASURE_CELL_CAP). Run from the repository root.
+spec:
+  backend:
+    kind: openai_http
+    request_format: /v1/chat/completions
+  profile:
+    kind: concurrent
+    streams: 8
+  data:
+    - kind: synthetic_text
+      prompt_tokens: 65536
+      output_tokens: 256
+  # 8 requests over 8 streams: each stream sends one, all 8 at once.
+  constraints:
+    - kind: max_requests
+      count: 8
