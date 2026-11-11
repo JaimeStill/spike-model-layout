@@ -1,8 +1,8 @@
 # goal · experiment.hosting.spike-model-layout
 
-- **State:** brief ready
-- **Task:** agent-vllm
-- **Branch:** agent-vllm
+- **State:** idle
+- **Task:** none
+- **Branch:** none
 
 ## Tasks
 
@@ -10,7 +10,7 @@
 2. [x] footprint
 3. [x] role-split
 4. [x] framework
-5. [ ] agent-vllm
+5. [x] agent-vllm
 6. [ ] on-demand
 7. [ ] two-node
 8. [ ] answer
@@ -257,10 +257,6 @@ Door          two-way: the pin and rows revert by a commit to host/, and
               updates); the page-cache drop uses gb10-1's existing
               sudoers rule. Nothing in the task can't be undone.
 ```
-
-## Progress
-
-slices 4/4 committed · standards done · spec done · editor done
 
 ## Decisions
 
