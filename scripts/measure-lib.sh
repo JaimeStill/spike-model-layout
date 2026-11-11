@@ -41,8 +41,10 @@
 #                                   on vLLM, its /metrics and its log's errors since the time
 #   footprint [<since>]             each llama-server's GPU memory and RSS by alias, the pool, and
 #                                   the load lines that size its buffers (default 10 minutes ago);
-#                                   on vLLM, the container's processes, the pool, and the start
-#                                   log's sizing lines (default since the container's start)
+#                                   on vLLM, the container's processes (on an amdgpu host each
+#                                   one's GTT and RSS), the pool (GTT and system memory there), and
+#                                   the start log's sizing lines (default since the container's
+#                                   start)
 #   watch <name> <command...>       run one command with GPU clocks and memory sampled, readouts
 #                                   at an interval, and the run stopped under the memory floor (on
 #                                   an amdgpu host, under either the GTT or the system floor)
@@ -61,9 +63,11 @@
 #   MEASURE_CELL_CAP       a cell's cap (default 10m)
 #   MEASURE_LOAD_WAIT      seconds a load or unload may take (default 600)
 #   MEASURE_ENGINE         the engine the port serves, llama or vllm: readout and footprint read
-#                          it (default vllm on port 8000, vLLM's, and llama on any other)
-#   MEASURE_CONTAINER      the engine's container on the host (default the engine's name, llama
-#                          or vllm)
+#                          it (default vllm on ports 8000, 8001 and 8002, vLLM's, and llama on any
+#                          other)
+#   MEASURE_CONTAINER      the engine's container on the host (default llama for llama.cpp, and
+#                          for vLLM the container that publishes the port, read on the host, or
+#                          vllm on port 8000 when none does)
 
 if ! (return 0 2>/dev/null); then
   echo 'measure-lib.sh is sourced, not run: source it with a host' >&2
@@ -162,19 +166,43 @@ _measure_lines() {
 }
 
 # The engine the helpers read, llama or vllm (MEASURE_ENGINE), and its container on the host
-# (MEASURE_CONTAINER, by default named as the engine is, as spike-model-engines' host/ names both).
-# The port tells them apart by default: vLLM's container publishes 8000, llama.cpp's router 8080.
+# (MEASURE_CONTAINER). The port tells them apart by default: vLLM's containers publish 8000, 8001
+# and 8002 (spike-model-engines' host/, one container a row, each row naming its port), llama.cpp's
+# router 8080. llama.cpp's container is llama. vLLM's is the one that publishes the port, read on
+# the host from each container's port bindings, so a stopped container is found too: the running
+# one when one runs, else the newest. When none publishes it, port 8000's is vllm, the suite's
+# default container, and any other port's is none, which the helper prints, returning 1.
 _measure_engine() {
   if [[ -n ${MEASURE_ENGINE-} ]]; then
     echo "$MEASURE_ENGINE"
-  elif [[ $MEASURE_PORT == 8000 ]]; then
+  elif [[ $MEASURE_PORT == 800[012] ]]; then
     echo vllm
   else
     echo llama
   fi
 }
 _measure_container() {
-  echo "${MEASURE_CONTAINER:-$(_measure_engine)}"
+  local name
+  if [[ -n ${MEASURE_CONTAINER-} ]]; then
+    echo "$MEASURE_CONTAINER"
+    return
+  elif [[ $(_measure_engine) != vllm ]]; then
+    echo llama
+    return
+  fi
+  # Each container as `<running> /<name> <host port>...`, the newest first, as docker lists them.
+  name=$(ssh "$MEASURE_HOST" 'docker container ls --all --quiet | xargs -r docker container inspect --format "{{.State.Running}} {{.Name}}{{range .HostConfig.PortBindings}}{{range .}} {{.HostPort}}{{end}}{{end}}"' |
+    awk -v p="$MEASURE_PORT" '{ for (i = 3; i <= NF; i++) if ($i == p) { n = substr($2, 2)
+        if ($1 == "true") { print n; found = 1; exit }; if (first == "") first = n } }
+      END { if (!found && first != "") print first }')
+  if [[ -n $name ]]; then
+    echo "$name"
+  elif [[ $MEASURE_PORT == 8000 ]]; then
+    echo vllm
+  else
+    echo "no container on $MEASURE_HOST publishes port $MEASURE_PORT" >&2
+    return 1
+  fi
 }
 
 _measure_refuse() {
@@ -336,16 +364,17 @@ readout() {
 #      label sets (one engine here, and one set a finish reason). The KV cache's usage is
 #      kv_cache_usage_perc, a fraction, or gpu_cache_usage_perc where an older release names it so.
 #      A metric the server doesn't report prints "-", so bench/readouts.awk never reads it as 0.
-#   2. the server log since <since>, on the host (or "not read" with docker's first line, when
-#      the logs can't be read, rather than counts of nothing): its ERROR lines, those of them, and the WARNING
-#      lines, that name Harmony, a parser or parsing, or a tool call (the output parsers' errors:
+#   2. the server log since <since>, on the host, of the container that publishes the port
+#      (_measure_container), named on the line (or "not read" with the first line of the reason,
+#      when no container publishes it or the logs can't be read, rather than counts of
+#      nothing): its ERROR lines, those of them, and the WARNING lines, that name Harmony, a parser or parsing, or a tool call (the output parsers' errors:
 #      the openai tool-call parser logs "Error in extracting tool call from response."), the
 #      lines naming HarmonyError (a traceback's last line among them), and the responses its
 #      access log gives a status of 400 or more. vLLM's lines read `(<process> pid=<n>) <LEVEL>
 #      <MM-DD> <time> [<file>:<line>] <message>`.
 #   3. memory.
 _measure_vllm_readout() {
-  local since=$1 log
+  local since=$1 log container
   curl -s --max-time 10 "$MEASURE_URL/metrics" | awk '
     # A metric the server does not report prints "-", never 0.
     function f(m, fmt) { return (m in v) ? sprintf(fmt, v[m]) : "-" }
@@ -366,11 +395,12 @@ _measure_vllm_readout() {
         f("vllm:prompt_tokens_total", "%d"), f("vllm:generation_tokens_total", "%d"),
         f("vllm:num_preemptions_total", "%d") }'
   log=$(mktemp)
-  if ! ssh "$MEASURE_HOST" docker logs --since "$since" "$(_measure_container)" >"$log" 2>&1; then
+  if ! container=$(_measure_container 2>"$log") ||
+    ! ssh "$MEASURE_HOST" docker logs --since "$since" "$container" >"$log" 2>&1; then
     printf 'log since %s: not read: %s\n' "$since" "$(head -n 1 "$log")"
   else
-    printf 'log since %s: ERROR lines %s, Harmony or parser errors and warnings %s, HarmonyError lines %s, responses >=400 %s\n' \
-      "$since" "$(grep -cE ' ERROR [0-9]{2}-[0-9]{2} ' "$log")" \
+    printf 'log since %s (%s): ERROR lines %s, Harmony or parser errors and warnings %s, HarmonyError lines %s, responses >=400 %s\n' \
+      "$since" "$container" "$(grep -cE ' ERROR [0-9]{2}-[0-9]{2} ' "$log")" \
       "$(grep -E ' (ERROR|WARNING) [0-9]{2}-[0-9]{2} ' "$log" | grep -ciE 'harmony|pars(e|er|ing)|tool.call')" \
       "$(grep -c 'HarmonyError' "$log")" "$(grep -cE '" [4-5][0-9]{2} ' "$log")"
   fi
@@ -458,11 +488,14 @@ docker logs --since "$since" "$container" 2>&1 |
 EOF
 }
 
-# footprint on vLLM, read on the host in one ssh call, in three parts:
+# footprint on vLLM, read on the host in one ssh call (after _measure_container's, which finds the
+# container that publishes the port), in three parts:
 #   1. the container's state and start time, then one line a process in it (docker top gives
-#      their host pids: the API server and the engine core): its pid, its name, nvidia-smi's
-#      used_memory for it, and its resident set from ps, then the container's totals.
-#   2. the pool, as on a llama.cpp GB10: MemTotal, MemAvailable and Cached.
+#      their host pids: the API server and the engine core): its pid, its name, its GPU memory,
+#      nvidia-smi's used_memory on a GB10 or amdgpu_top's VRAM and GTT on a Strix Halo, both by
+#      host pid as on llama.cpp, and its resident set from ps, then the container's totals.
+#   2. the pool, as on llama.cpp: MemTotal, MemAvailable and Cached on a GB10; GTT used and total
+#      on a Strix Halo, with system MemAvailable beside it, the pool the GTT doesn't cover.
 #   3. the container's log since <since>, by default since its current start (a restart's
 #      StartedAt), so a timed restart reads its own lines and not the first start's: the lines
 #      that size the start, matched loosely, as v0.32.0 logged them (spike-model-engines,
@@ -477,11 +510,13 @@ EOF
 #      non-default args line, which lists every flag the row gives, is cut to its sizing flags.
 #      Each line is cut at 300 characters.
 _measure_vllm_footprint() {
+  local container
+  container=$(_measure_container) || return 1
   # The script runs on the host, its expansions unexpanded here (the quoted here-document); its
   # two arguments, the time (empty for the container's start) and the container, are expanded
   # here and quoted for the host's shell.
   # shellcheck disable=SC2029
-  ssh "$MEASURE_HOST" "bash -s -- $(printf '%q ' "${1-}" "$(_measure_container)")" <<'EOF'
+  ssh "$MEASURE_HOST" "bash -s -- $(printf '%q ' "${1-}" "$container")" <<'EOF'
 since=$1 container=$2
 if ! state=$(docker container inspect --format '{{.State.Status}} {{.State.StartedAt}}' "$container" 2>/dev/null); then
   echo "container $container: none"
@@ -493,9 +528,18 @@ echo "container $container: $status, started $started"
 pids=$(docker top "$container" -eo pid 2>/dev/null | awk 'NR > 1 { print $1 }' | paste -sd,)
 procs=
 [ -z "$pids" ] || procs=$(ps -o pid=,rss=,comm= -p "$pids")
+card=
+for d in /sys/class/drm/card*/device; do
+  [ -r "$d/mem_info_gtt_total" ] && { card=$d; break; }
+done
 if command -v nvidia-smi >/dev/null; then
   kind=nvidia
   gpu=$(nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader,nounits | tr -d ' ' | tr , ' ')
+elif [ -n "$card" ] && command -v amdgpu_top >/dev/null; then
+  kind=amdgpu
+  # amdgpu_top -p prints a process as `<name> (<pid>), ctxs <n>, VRAM <n> MiB (<pct>), GTT ...`.
+  gpu=$(timeout 30 amdgpu_top -p 2>/dev/null |
+    sed -nE 's/.*\( *([0-9]+)\), ctxs +[0-9]+, VRAM +([0-9]+) MiB.*GTT +([0-9]+) MiB.*/\1 \2 \3/p')
 else
   kind=none gpu=
 fi
@@ -503,16 +547,29 @@ echo "processes ($kind):"
 if [ -z "$procs" ]; then
   echo "  none: the container runs no process"
 else
-  awk -v kind="$kind" 'NR == FNR { if ($1 != "") v[$1] = $2; next }
+  awk -v kind="$kind" 'NR == FNR { if ($1 != "") { v[$1] = $2; g[$1] = $3 }; next }
     { if (kind == "nvidia") { m = ($1 in v) ? sprintf("gpu %d MiB", v[$1]) : "gpu none"; tg += v[$1] }
+      else if (kind == "amdgpu") {
+        m = ($1 in v) ? sprintf("vram %d MiB, gtt %d MiB", v[$1], g[$1]) : "vram none, gtt none"
+        tv += v[$1]; tg += g[$1] }
       else m = "no GPU read"
       tr += $2
       printf "  %s: pid %s, %s, rss %d MiB\n", $3, $1, m, $2 / 1024 }
-    END { printf "  container: %s, rss %d MiB\n", kind == "nvidia" ? sprintf("gpu %d MiB", tg) : "no GPU read", tr / 1024 }' \
+    END { if (kind == "nvidia") m = sprintf("gpu %d MiB", tg)
+          else if (kind == "amdgpu") m = sprintf("vram %d MiB, gtt %d MiB", tv, tg)
+          else m = "no GPU read"
+          printf "  container: %s, rss %d MiB\n", m, tr / 1024 }' \
     <(printf '%s\n' "$gpu") <(printf '%s\n' "$procs")
 fi
-awk '/^(MemTotal|MemAvailable|Cached):/ { m[$1] = $2 / 2^20 }
-  END { printf "pool: MemTotal %.2f GiB, MemAvailable %.2f GiB, Cached %.2f GiB\n", m["MemTotal:"], m["MemAvailable:"], m["Cached:"] }' /proc/meminfo
+if [ "$kind" = amdgpu ]; then
+  # GTT, and beside it system memory, the pool the GTT doesn't cover, as llama.cpp's footprint.
+  awk -v u="$(cat "$card/mem_info_gtt_used")" -v t="$(cat "$card/mem_info_gtt_total")" \
+    '/^MemAvailable:/ { m = $2 / 2^20 }
+    END { printf "pool: GTT used %.2f GiB of %.2f GiB; system MemAvailable %.2f GiB\n", u / 2^30, t / 2^30, m }' /proc/meminfo
+else
+  awk '/^(MemTotal|MemAvailable|Cached):/ { m[$1] = $2 / 2^20 }
+    END { printf "pool: MemTotal %.2f GiB, MemAvailable %.2f GiB, Cached %.2f GiB\n", m["MemTotal:"], m["MemAvailable:"], m["Cached:"] }' /proc/meminfo
+fi
 echo "start log since $since:"
 docker logs --since "$since" "$container" 2>&1 |
   grep -E 'API server version|non-default args|Model loading took|Free memory on device|peak activation|Available KV cache memory|[Kk][Vv][_ -][Cc]ache[_ -][Mm]emory|KV cache size|Maximum concurrency|Directly load|torch\.compile take|Graph capturing finished|[Uu]sing .*[Bb]ackend|[Aa]ttention backend|MoE backend|Application startup complete' |
