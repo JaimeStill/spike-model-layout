@@ -15,6 +15,10 @@ the target in `GUIDELLM__SPEC__BACKEND__TARGET`. Each file's header gives its lo
   one request each, 65,536 prompt tokens and 256 out, on each of vLLM's agent rows, run with the
   helpers sourced for port 8000 and `MEASURE_READOUT_EVERY=30` (the agent-vllm finding,
   [`docs/findings/agent-vllm.md`](../docs/findings/agent-vllm.md)).
+- The capability-vllm task added no scenario: its cells run role-split's files unchanged on both
+  engines, on vLLM with the helpers sourced for each row's port and the row's served model
+  (the capability-vllm finding,
+  [`docs/findings/capability-vllm.md`](../docs/findings/capability-vllm.md)).
 
 ## Role-split's cells
 
