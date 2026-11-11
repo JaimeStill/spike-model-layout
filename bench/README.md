@@ -136,14 +136,15 @@ percentiles interpolate linearly between the two nearest ranks.
 
 ## Reading the capacity cell: `capacity.jq` and `readouts.awk`
 
-`levels.jq` reads the capacity cell (`agent-vllm-capacity.yaml`) as one level's medians.
-[`capacity.jq`](capacity.jq) reads it a request at a time, in order of start: each request's
-status, start from the first's, TTFT, latency, prompt tokens and output tokens against the
-scenario's 256, then the counts, TTFT and latency medians and extremes, and the spread of the
-starts. [`readouts.awk`](readouts.awk) reads the readouts `watch` printed every 30 s (a step's
-output, or the measure log's lines for the cell): the highest running, waiting and KV cache usage,
-and the preemptions between the first and last counters line, since vLLM counts from its start;
-a line with a figure the server didn't report (`-`) counts apart, never as 0.
+[`capacity.jq`](capacity.jq) reads the capacity cell's JSON (`agent-vllm-capacity.yaml`) a
+request at a time, where `levels.jq` gives only the level's medians. In order of start, it prints
+each request's status, start from the first's, TTFT, latency, prompt tokens, and output tokens
+against the scenario's 256, then the counts, the TTFT and latency medians and extremes, and the
+spread of the starts. [`readouts.awk`](readouts.awk) reads the readouts `watch` printed every 30 s
+(a step's output, or the measure log's lines for the cell). It prints the highest running, waiting
+and KV cache usage, and the preemptions between the first and last counters line, since vLLM
+counts preemptions from its start. A line with a figure the server didn't report (`-`) counts
+apart, never as 0.
 
 ```sh
 jq -r -f bench/capacity.jq .state/measure/gb10-1/agent-vllm-b-cap.json

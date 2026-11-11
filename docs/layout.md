@@ -61,9 +61,9 @@ load target of 4.
 The [agent-vllm finding](findings/agent-vllm.md) measured gpt-oss-120b alone on gb10-1, on
 llama.cpp's agent-only section and on two vLLM v0.33.0 rows in a container, each at 131,072 tokens
 a sequence and 16 sequences, one engine at a time in one session (sections C, F, H and I). Every
-run was direct on the LAN, so these are LAN figures. "Meets the floor through" is the highest
-level of role-split's S-agent sweep with ITL median ≤100 ms; under role-split's rule for "holds"
-the BF16 row holds 4, since its knee is 6.71 (finding, F).
+measuring run went direct on the LAN, so these are LAN figures. "Meets the floor through" is the
+highest level of role-split's S-agent sweep with ITL median ≤100 ms. Under role-split's rule for
+"holds", llama.cpp holds 4, the BF16 row 4 (its knee is 6.71) and the FP8 row 12 (finding, F).
 
 | Engine and row | At the target of 4: output tok/s, ITL, TTFT | Meets the floor through | 1 stream: tok/s, ITL | KV tokens; 131,072-token sessions (c) | 8 × 65,603-token requests at once | Pool idle / lowest under load (floor 12.2 GiB) | Cold start |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -76,8 +76,8 @@ if its output quality matches BF16's, which only the two probes and the error co
 accuracy check is the open item (finding, N). The architect accepts vLLM's longer cold start for a
 resident agent in exchange for its concurrency (the architect's preference, finding summary).
 v0.33.0 counts about 38,058 bytes of KV a token in BF16 and 19,028 in FP8 (c), against v0.32.0's
-55,936 (c), so the earlier computed vLLM capacities (493,523 tokens; 1,179,648 for the FP8 bytes)
-no longer hold (finding, I.2).
+55,936 (c), so v0.32.0's 493,523-token BF16 cache and the 1,179,648 tokens computed for the FP8
+row's bytes don't describe v0.33.0 (finding, I.2).
 
 ## Sizing
 

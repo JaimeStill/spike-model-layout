@@ -353,8 +353,8 @@ The 0.80 still gates the startup free-memory check. In v0.33.0's source (checked
 2026-11-11, not measured), `request_memory` computes the requested memory as total × 0.80 and
 raises "Free memory on device … is less than desired GPU memory utilization" when free memory is
 below it (`vllm/v1/worker/utils.py:716-772`, the check at 761-770). The worker calls it at device
-start, before any KV sizing (`vllm/v1/worker/gpu_worker.py:542`). The bytes skip only the profiling
-and the cache sizing: the worker returns `kv_cache_memory_bytes` with the message above
+start, before any KV sizing (`vllm/v1/worker/gpu_worker.py:542`). The bytes skip the memory profiling
+and size the cache: the worker returns `kv_cache_memory_bytes` with the message above
 (`gpu_worker.py:656-681`), and the option's docstring says it "ignores gpu_memory_utilization"
 (`vllm/config/cache.py:374-381`).
 

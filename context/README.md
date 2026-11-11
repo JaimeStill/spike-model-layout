@@ -93,12 +93,16 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
 - **The step helpers:** `scripts/measure-lib.sh`, adapted from spike-hosting-upgrades' without its
   tier and conform helpers, sourced and called one step at a time, logging every command to this
   spike's `.state/measure/<host>/`. The read-only `footprint` helper prints each llama-server
-  process's memory, the pool, and the router's buffer lines. On an amdgpu host the helpers read
-  system memory beside GTT, and `watch` refuses to start without the system-memory floor
-  (`MEASURE_SYSTEM_FLOOR_GIB`) and stops a cell under either floor.
+  process's memory, the pool, and the router's buffer lines. Sourced for port 8000, `footprint`
+  and `readout` read the `vllm` container instead (`MEASURE_ENGINE` overrides the choice):
+  `footprint` prints its processes' memory, the pool, and the start log's sizing lines, and
+  `readout` prints vLLM's `/metrics` and counts the server log's errors. On an amdgpu host the
+  helpers read system memory beside GTT, and `watch` refuses to start without the system-memory
+  floor (`MEASURE_SYSTEM_FLOOR_GIB`) and stops a cell under either floor.
 - **The result readers:** `bench/levels.jq` turns GuideLLM's result JSON into per-level tables
-  judged against each purpose's floor, and `bench/srvtimes.awk` with `bench/stats.awk` reads each
-  request's server timings from the router log, [`bench/README.md`](../bench/README.md).
+  judged against each purpose's floor, `bench/srvtimes.awk` with `bench/stats.awk` reads each
+  request's server timings from the router log, and `bench/capacity.jq` with `bench/readouts.awk`
+  reads the vLLM capacity cell, [`bench/README.md`](../bench/README.md).
 
 ## Path
 
