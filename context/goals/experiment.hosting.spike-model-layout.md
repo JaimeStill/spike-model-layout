@@ -1,6 +1,6 @@
 # goal · experiment.hosting.spike-model-layout
 
-- **State:** building
+- **State:** brief ready
 - **Task:** agent-vllm
 - **Branch:** agent-vllm
 
@@ -260,7 +260,7 @@ Door          two-way: the pin and rows revert by a commit to host/, and
 
 ## Progress
 
-slices 3/4 committed (4 is the architect's walkthrough) · standards done · spec done · editor done
+slices 4/4 committed · standards done · spec done · editor done
 
 ## Decisions
 
@@ -428,6 +428,7 @@ slices 3/4 committed (4 is the architect's walkthrough) · standards done · spe
 - agent-vllm (BUILD): for the agent, a longer cold start is accepted in exchange for better concurrency and overall performance (the architect).
 - agent-vllm (BUILD): vLLM is the more attractive engine for the agent, chiefly for its concurrency (the architect).
 - agent-vllm (BUILD): the finding's conclusion is framed as evidence: vLLM is the stronger agent engine on gb10-1, the FP8 row leads the BF16 row if its output quality matches, and FP8's uncalibrated KV cache is the one open item (the architect).
+- agent-vllm: the architect's walkthrough reproduced the FP8 row's sizing (1,733,910 tokens) and its level 4 (ITL 49.85 against 49.55 ms; every-token 74.28 against 74.38 tok/s); its pool read (15.19 GiB) came straight after the start, without the finding's warm-up, idle and cache drop, and is recorded as that, not isolated (docs/findings/agent-vllm.md, L.4).
 
 ## Pending edits
 
