@@ -367,8 +367,10 @@ readout() {
 #   2. the server log since <since>, on the host, of the container that publishes the port
 #      (_measure_container), named on the line (or "not read" with the first line of the reason,
 #      when no container publishes it or the logs can't be read, rather than counts of
-#      nothing): its ERROR lines, those of them, and the WARNING lines, that name Harmony, a parser or parsing, or a tool call (the output parsers' errors:
-#      the openai tool-call parser logs "Error in extracting tool call from response."), the
+#      nothing): its ERROR lines, those of them, and the WARNING lines, that name Harmony, a parser
+#      or parsing, or a tool call (the output parsers' errors: the openai tool-call parser logs
+#      "Error in extracting tool call from response."), "parse" not read inside "sparse", which
+#      ROCm's compilation warnings name (`Op 'sparse_attn_indexer' not present`), the
 #      lines naming HarmonyError (a traceback's last line among them), and the responses its
 #      access log gives a status of 400 or more. vLLM's lines read `(<process> pid=<n>) <LEVEL>
 #      <MM-DD> <time> [<file>:<line>] <message>`.
@@ -401,7 +403,7 @@ _measure_vllm_readout() {
   else
     printf 'log since %s (%s): ERROR lines %s, Harmony or parser errors and warnings %s, HarmonyError lines %s, responses >=400 %s\n' \
       "$since" "$container" "$(grep -cE ' ERROR [0-9]{2}-[0-9]{2} ' "$log")" \
-      "$(grep -E ' (ERROR|WARNING) [0-9]{2}-[0-9]{2} ' "$log" | grep -ciE 'harmony|pars(e|er|ing)|tool.call')" \
+      "$(grep -E ' (ERROR|WARNING) [0-9]{2}-[0-9]{2} ' "$log" | grep -ciE 'harmony|(^|[^s])pars(e|er|ing)|tool.call')" \
       "$(grep -c 'HarmonyError' "$log")" "$(grep -cE '" [4-5][0-9]{2} ' "$log")"
   fi
   rm -f "$log"
