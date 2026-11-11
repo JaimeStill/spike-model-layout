@@ -315,7 +315,7 @@ readout() {
     return
   fi
   log=$(mktemp)
-  ssh "$MEASURE_HOST" docker logs --since "$since" "${MEASURE_CONTAINER:-llama}" >"$log" 2>&1
+  ssh "$MEASURE_HOST" docker logs --since "$since" "$(_measure_container)" >"$log" 2>&1
   printf 'readout since %s: idle-slot saves %s, prompt saves %s, checkpoints %s, ' "$since" \
     "$(grep -c 'saving idle slot' "$log")" "$(grep -c 'prompt_save:  - saving' "$log")" \
     "$(grep -c 'created context checkpoint' "$log")"
@@ -335,7 +335,9 @@ readout() {
 #      (by reason), prompt and generation tokens, and preemptions. A metric is summed over its
 #      label sets (one engine here, and one set a finish reason). The KV cache's usage is
 #      kv_cache_usage_perc, a fraction, or gpu_cache_usage_perc where an older release names it so.
-#   2. the server log since <since>, on the host: its ERROR lines, those of them, and the WARNING
+#      A metric the server doesn't report prints "-", so bench/readouts.awk never reads it as 0.
+#   2. the server log since <since>, on the host (or "not read" with docker's first line, when
+#      the logs can't be read, rather than counts of nothing): its ERROR lines, those of them, and the WARNING
 #      lines, that name Harmony, a parser or parsing, or a tool call (the output parsers' errors:
 #      the openai tool-call parser logs "Error in extracting tool call from response."), the
 #      lines naming HarmonyError (a traceback's last line among them), and the responses its
@@ -345,26 +347,33 @@ readout() {
 _measure_vllm_readout() {
   local since=$1 log
   curl -s --max-time 10 "$MEASURE_URL/metrics" | awk '
+    # A metric the server does not report prints "-", never 0.
+    function f(m, fmt) { return (m in v) ? sprintf(fmt, v[m]) : "-" }
     /^vllm:/ { n = $1; sub(/\{.*/, "", n); v[n] += $NF
       if (n == "vllm:request_success_total" && match($1, /finished_reason="[^"]*"/))
         r[substr($1, RSTART + 17, RLENGTH - 18)] += $NF }
     END {
       if (!length(v)) { print "metrics: none read"; exit }
-      kv = ("vllm:kv_cache_usage_perc" in v) ? v["vllm:kv_cache_usage_perc"] : v["vllm:gpu_cache_usage_perc"]
-      printf "metrics: running %d, waiting %d, kv cache usage %.1f%%\n",
-        v["vllm:num_requests_running"], v["vllm:num_requests_waiting"], kv * 100
+      if (!("vllm:kv_cache_usage_perc" in v) && ("vllm:gpu_cache_usage_perc" in v))
+        v["vllm:kv_cache_usage_perc"] = v["vllm:gpu_cache_usage_perc"]
+      if ("vllm:kv_cache_usage_perc" in v) v["vllm:kv_cache_usage_perc"] *= 100
+      printf "metrics: running %s, waiting %s, kv cache usage %s\n", f("vllm:num_requests_running", "%d"),
+        f("vllm:num_requests_waiting", "%d"), f("vllm:kv_cache_usage_perc", "%.1f%%")
       reasons = ""
       for (k in r) reasons = reasons (reasons == "" ? "" : ", ") k " " r[k]
-      printf "counters: requests ok %d%s, prompt tokens %d, generation tokens %d, preemptions %d\n",
-        v["vllm:request_success_total"], reasons == "" ? "" : " (" reasons ")",
-        v["vllm:prompt_tokens_total"], v["vllm:generation_tokens_total"],
-        v["vllm:num_preemptions_total"] }'
+      printf "counters: requests ok %s%s, prompt tokens %s, generation tokens %s, preemptions %s\n",
+        f("vllm:request_success_total", "%d"), reasons == "" ? "" : " (" reasons ")",
+        f("vllm:prompt_tokens_total", "%d"), f("vllm:generation_tokens_total", "%d"),
+        f("vllm:num_preemptions_total", "%d") }'
   log=$(mktemp)
-  ssh "$MEASURE_HOST" docker logs --since "$since" "$(_measure_container)" >"$log" 2>&1
-  printf 'log since %s: ERROR lines %s, Harmony or parser errors and warnings %s, HarmonyError lines %s, responses >=400 %s\n' \
-    "$since" "$(grep -cE ' ERROR [0-9]{2}-[0-9]{2} ' "$log")" \
-    "$(grep -E ' (ERROR|WARNING) [0-9]{2}-[0-9]{2} ' "$log" | grep -ciE 'harmony|pars(e|er|ing)|tool.call')" \
-    "$(grep -c 'HarmonyError' "$log")" "$(grep -cE '" [4-5][0-9]{2} ' "$log")"
+  if ! ssh "$MEASURE_HOST" docker logs --since "$since" "$(_measure_container)" >"$log" 2>&1; then
+    printf 'log since %s: not read: %s\n' "$since" "$(head -n 1 "$log")"
+  else
+    printf 'log since %s: ERROR lines %s, Harmony or parser errors and warnings %s, HarmonyError lines %s, responses >=400 %s\n' \
+      "$since" "$(grep -cE ' ERROR [0-9]{2}-[0-9]{2} ' "$log")" \
+      "$(grep -E ' (ERROR|WARNING) [0-9]{2}-[0-9]{2} ' "$log" | grep -ciE 'harmony|pars(e|er|ing)|tool.call')" \
+      "$(grep -c 'HarmonyError' "$log")" "$(grep -cE '" [4-5][0-9]{2} ' "$log")"
+  fi
   rm -f "$log"
   memory
 }
@@ -396,7 +405,7 @@ footprint() {
   # The script runs on the host, its expansions unexpanded here (the quoted here-document); its
   # two arguments, the time and the container, are expanded here and quoted for the host's shell.
   # shellcheck disable=SC2029
-  ssh "$MEASURE_HOST" "bash -s -- $(printf '%q ' "$since" "${MEASURE_CONTAINER:-llama}")" <<'EOF'
+  ssh "$MEASURE_HOST" "bash -s -- $(printf '%q ' "$since" "$(_measure_container)")" <<'EOF'
 since=$1 container=$2
 # pid, RSS KiB, port and alias of every llama-server process.
 procs=$(ps -eo pid=,rss=,args= | awk '$3 ~ /(^|\/)llama-server$/ {

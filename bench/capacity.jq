@@ -9,9 +9,10 @@
 # reasoning included), its latency in s (request_end_time - request_start_time, or to the cut for
 # an incomplete one, "-" when GuideLLM recorded no end), its prompt tokens, and its completion:
 # the output tokens over the scenario's output_tokens when the data names them. Then a summary
-# line: counts by status; TTFT median, min and max of the successful; latency median and max of
-# the successful; and the spread of the starts, the last request's start from the first's, which
-# reads whether every stream's request was sent at once.
+# line: counts by status over every request, those GuideLLM never started (no start time, so no
+# row) counted apart, and the completed of them all; TTFT median, min and max of the successful;
+# latency median and max of the successful; and the spread of the starts, the last request's
+# start from the first's, which reads whether every stream's request was sent at once.
 #
 # Medians interpolate linearly between the two nearest ranks. Numbers are rounded half away from
 # zero at the printed digits (jq's round); "-" marks a figure GuideLLM did not record.
@@ -32,8 +33,8 @@ def capacity($spec_out):
   $spec_out as $want | (.config.strategy.streams // "-") as $streams
   | [ (.requests.successful[] | {s: "ok"} + .),
       (.requests.errored[] | {s: "errored"} + .),
-      (.requests.incomplete[] | {s: "incomplete"} + .) ]
-  | map(select(.request_start_time != null)) | sort_by(.request_start_time) as $rs
+      (.requests.incomplete[] | {s: "incomplete"} + .) ] as $all
+  | $all | map(select(.request_start_time != null)) | sort_by(.request_start_time) as $rs
   | ($rs[0].request_start_time // 0) as $t0
   | [$rs[] | select(.s == "ok")] as $ok
   | "streams \($streams): requests in order of start",
@@ -46,8 +47,9 @@ def capacity($spec_out):
          (.prompt_tokens // "-" | tostring),
          ((.output_tokens // 0 | tostring) + (if $want then "/\($want)" else "" end)) ]
      | join(" | ")),
-    "summary: ok \($ok | length), errored \([$rs[] | select(.s == "errored")] | length), incomplete \([$rs[] | select(.s == "incomplete")] | length)"
-    + (if $want then ", complete \([$ok[] | select(.output_tokens == $want)] | length)/\($rs | length)" else "" end)
+    "summary: ok \($ok | length), errored \([$all[] | select(.s == "errored")] | length), incomplete \([$all[] | select(.s == "incomplete")] | length)"
+    + (($all | length) - ($rs | length) | if . > 0 then ", never started \(.)" else "" end)
+    + (if $want then ", complete \([$ok[] | select(.output_tokens == $want)] | length)/\($all | length)" else "" end)
     + "; TTFT ms median \([$ok[].time_to_first_token_ms] | median | fixed(0)), min \([$ok[].time_to_first_token_ms] | min | fixed(0)), max \([$ok[].time_to_first_token_ms] | max | fixed(0))"
     + "; latency s median \([$ok[] | .request_end_time - .request_start_time] | median | fixed(2)), max \([$ok[] | .request_end_time - .request_start_time] | max | fixed(2))"
     + "; starts spread \(($rs[-1].request_start_time // $t0) - $t0 | fixed(2)) s";

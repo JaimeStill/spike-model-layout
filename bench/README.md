@@ -142,7 +142,8 @@ status, start from the first's, TTFT, latency, prompt tokens and output tokens a
 scenario's 256, then the counts, TTFT and latency medians and extremes, and the spread of the
 starts. [`readouts.awk`](readouts.awk) reads the readouts `watch` printed every 30 s (a step's
 output, or the measure log's lines for the cell): the highest running, waiting and KV cache usage,
-and the preemptions between the first and last counters line, since vLLM counts from its start.
+and the preemptions between the first and last counters line, since vLLM counts from its start;
+a line with a figure the server didn't report (`-`) counts apart, never as 0.
 
 ```sh
 jq -r -f bench/capacity.jq .state/measure/gb10-1/agent-vllm-b-cap.json
