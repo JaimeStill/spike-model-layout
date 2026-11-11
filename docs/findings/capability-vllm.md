@@ -1719,9 +1719,11 @@ Each step file's write and launch, the probe inputs, the two-host rerun and the 
 from the laptop outside the step helpers. They are quoted from the session's command history, each
 headed by its time (UTC), from the project's root unless the command changes directory. Where a
 command wrote a step file with a heredoc, `…` stands for its body, which is the step file's copy in
-`.state/capability-vllm/step-files/` (`mkprobes.py` and `imports.py` among them). `<scratchpad>` is
-as above. Left out: the reads of a step's output that only printed it, the waits that polled for a
-step's end, and the session's monitoring reads over SSH during staging (pending updates at
+`.state/capability-vllm/step-files/` (`mkprobes.py` and `imports.py` among them). Those two and
+the inline `python3 -` edit at 22:18:10Z are throwaway session helpers, quoted as run and never
+tracked; they depart from the spike's rule that no Python is authored (`STANDARDS.md`, "Tools"),
+and nothing in the repository depends on them. `<scratchpad>` is as above. Left out: the reads of
+a step's output that only printed it, the waits that polled for a step's end, and the session's monitoring reads over SSH during staging (pending updates at
 19:05Z, staging progress at 19:56Z and 20:35Z), which changed nothing and no figure rests on; and
 the laptop's own clean-up before the rerun (I). The session's command at 21:16:32Z, which copied
 the step files and slice 1's outputs into `.state/capability-vllm/` and wrote
