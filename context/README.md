@@ -92,19 +92,21 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
 - **The vLLM agent comparison** against llama.cpp on gb10-1,
   [`docs/findings/agent-vllm.md`](../docs/findings/agent-vllm.md).
 - **The vLLM capability comparison** against llama.cpp on gb10-2 and the Framework: vision, audio
-  and embedding, each in its own process.
+  and embedding, each in its own process,
+  [`docs/findings/capability-vllm.md`](../docs/findings/capability-vllm.md).
 - **On-demand serving** through llama.cpp's router.
 - **Two-node serving** over QSFP with vLLM and Ray.
 - **The layout document:** [`docs/layout.md`](../docs/layout.md), living, finalized by the answer.
 - **The step helpers:** `scripts/measure-lib.sh`, adapted from spike-hosting-upgrades' without its
   tier and conform helpers, sourced and called one step at a time, logging every command to this
   spike's `.state/measure/<host>/`. The read-only `footprint` helper prints each llama-server
-  process's memory, the pool, and the router's buffer lines. Sourced for port 8000, `footprint`
-  and `readout` read the `vllm` container instead (`MEASURE_ENGINE` overrides the choice):
-  `footprint` prints its processes' memory, the pool, and the start log's sizing lines, and
-  `readout` prints vLLM's `/metrics` and counts the server log's errors. On an amdgpu host the
-  helpers read system memory beside GTT, and `watch` refuses to start without the system-memory
-  floor (`MEASURE_SYSTEM_FLOOR_GIB`) and stops a cell under either floor.
+  process's memory, the pool, and the router's buffer lines. Sourced for port 8000, 8001 or 8002,
+  `footprint` and `readout` read the vLLM container that publishes that port instead
+  (`MEASURE_ENGINE` and `MEASURE_CONTAINER` override the choice): `footprint` prints its
+  processes' memory, the pool, and the start log's sizing lines, and `readout` prints vLLM's
+  `/metrics` and counts the server log's errors. On an amdgpu host vLLM's `footprint` prints each
+  process's GTT and RSS, the helpers read system memory beside GTT, and `watch` refuses to start
+  without the system-memory floor (`MEASURE_SYSTEM_FLOOR_GIB`) and stops a cell under either floor.
 - **The result readers:** `bench/levels.jq` turns GuideLLM's result JSON into per-level tables
   judged against each purpose's floor, `bench/srvtimes.awk` with `bench/stats.awk` reads each
   request's server timings from the router log, and `bench/capacity.jq` with `bench/readouts.awk`
@@ -131,7 +133,7 @@ and load targets are agreed in its task's own plan round.
    gb10-1, in one session (evidence 6).
 6. `capability-vllm`: vision (Gemma 4 26B-A4B), audio (E4B) and embedding (granite) on vLLM
    v0.33.0 in containers, each in its own process, alone and together, on gb10-2 and on the
-   Framework (vLLM ROCm), against llama.cpp's figures from role-split and framework; a pull request
+   Framework (vLLM ROCm), against llama.cpp's sections rerun in the same session; a pull request
    to spike-model-engines' `host/` first gives each row its own container, port and memory fraction
    (evidence 3, 5, beside 6).
 7. `on-demand`: llama.cpp's router loading models on demand against keeping them resident, on

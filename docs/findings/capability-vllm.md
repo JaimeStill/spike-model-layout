@@ -63,8 +63,6 @@ It also found that:
 - llama.cpp's vision errored 5 requests in all with the Gemma 4 output parser's `peg-gemma4`
   error; vLLM's rows errored none, and their server logs held no error line in any cell (L).
 
-It decides nothing.
-
 **The conclusion, as evidence.** The spike records it and decides nothing.
 
 - On this session's figures, **vLLM is the stronger capability engine on both hosts for each
@@ -911,17 +909,17 @@ the stack read at 14:11:58: the `source <scratchpad>/…` lines are the step fil
 `.state/capability-vllm/step-files/`), and the commands traced after each are what they ran.
 `<scratchpad>` stands for the session's scratch directory,
 `/tmp/claude-1000/-home-jaime-experiments-spike-model-layout/2e3d57aa-b8da-4d02-b02e-a7668095d1c1/scratchpad`.
-Left in the log: every line inside a helper (`load`, `memory`, `footprint`, `cell`, `readout`,
-`after`, `v_after`, `vwait`, `startlog`, `drop`, `ping_host`, `served`, `floorcheck` and the rest,
-each traced with its name), the log's header lines and the floors `step.sh` exported, the lines
-`source scripts/measure-lib.sh` traced as it set itself up (its variables and its export of
-`GUIDELLM__SPEC__BACKEND__TARGET`), `v-common.sh`'s variable and array assignments, the `date -u`
-and `tee -a … ping-2026-11-11.txt` halves of each `{ date -u +%FT%TZ; tailscale ping -c 1 <host>;
-} 2>&1 | tee -a …` line (its `tailscale ping` is kept), each loop's `for … in` line, which the trace
-prints before every pass, and `[[ … ]]` tests. A pipeline prints each of its commands, and
-processes started with `&` print in the order the shell reached them. The probes' two `jq -n
---arg` lines carry the image and the clip as base64; `…` stands for each payload, which is
-`base64 -w0` of `probes/probe-image.png` and of `probes/probe-clip.wav`.
+Left in the log and not quoted here: every line inside a helper (`load`, `memory`, `footprint`,
+`cell`, `readout`, `after`, `v_after`, `vwait`, `startlog`, `drop`, `ping_host`, `served`,
+`floorcheck` and the rest, each traced with its name), the log's header lines and the floors
+`step.sh` exported, the lines `source scripts/measure-lib.sh` traced as it set itself up (its
+variables and its export of `GUIDELLM__SPEC__BACKEND__TARGET`), `v-common.sh`'s variable and array
+assignments, the `date -u` and `tee -a … ping-2026-11-11.txt` halves of each `{ date -u +%FT%TZ;
+tailscale ping -c 1 <host>; } 2>&1 | tee -a …` line (its `tailscale ping` is kept), each
+loop's `for … in` line, which the trace prints before every pass, and `[[ … ]]` tests. A pipeline
+prints each of its commands, and processes started with `&` print in the order the shell reached
+them. The probes' two `jq -n --arg` lines carry the image and the clip as base64; `…` stands for
+each payload, which is `base64 -w0` of `probes/probe-image.png` and of `probes/probe-clip.wav`.
 
 ```
 14:11:58  : 'capability-vllm stack on gb10-2: pending updates, kernel, driver, CUDA, Docker, Tailscale, the engine containers and images, the clone (read only)'
@@ -1942,8 +1940,8 @@ D=<scratchpad>; cd /home/jaime/experiments/spike-model-layout; SECTIONS="gemma-4
 cd /home/jaime/experiments/spike-model-layout; D=<scratchpad>; S=.state/capability-vllm; grep -hE '^memory' $S/l-load-*.out | tail -4; for f in v-install v-cold v-probe v-probe-audio v-vision v-audio v-embed v-mixed v-two v-restore; do for h in gb10-2 framework; do [ -f $D/$f-$h.out ] && cp $D/$f-$h.out $S/; done; done; cp $D/v-two-laptop-free.txt $D/v-cells.sh $D/v-probe-audio.sh $S/step-files/ 2>/dev/null; mv $S/step-files/v-two-laptop-free.txt $S/; cp $D/v-*.sh $S/step-files/; { for h in gb10-2 framework; do for c in vision audio embed mixed-vision mixed-audio mixed-embed two-vision two-audio two-embed; do p=${c##*-}; echo "# $h/capability-vllm-v-$c.json"; jq -r --arg purpose $p -f bench/levels.jq .state/measure/$h/capability-vllm-v-$c.json; done; done; } > $S/jq-figures-slice2.txt; git status --short | head; ls $S | wc -l
 ```
 
-In this finding's slice, after the re-read below, the two-host rerun's step outputs kept beside
-the reaped run's (23:17:12Z):
+In this finding's slice, after the re-read below, this command kept the two-host rerun's step
+outputs beside the reaped run's (23:17:12Z):
 
 ```sh
 cd /home/jaime/experiments/spike-model-layout && D=<scratchpad>; for h in gb10-2 framework; do cp $D/two-$h.out .state/capability-vllm/two-rerun-$h.out; done; ls -la .state/capability-vllm/two-*; head -3 .state/measure/framework/capability-vllm-v-vision.watch.tsv; sort -t$'\t' -k5,5n .state/measure/framework/capability-vllm-v-vision.watch.tsv | head -2

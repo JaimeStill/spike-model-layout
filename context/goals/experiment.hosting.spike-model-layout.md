@@ -297,7 +297,7 @@ Door          two-way: the rows, suite changes and audio image revert by
 
 ## Progress
 
-slices 3/4 committed (slice 1: engines 4ad76e6, layout b55d744; slice 2: layout c881c29; slice 3: layout b2f432c) · standards — · spec — · editor —
+slices 3/4 committed (slice 1: engines 4ad76e6, layout b55d744; slice 2: layout c881c29; slice 3: layout b2f432c) · standards done (88c6b2f, 760cfc7, bb68cbd) · spec done, gaps closed (8a1e147; the audio probe rerun's path and the staged `-rocm72` images, Decisions) · editor done · slice 4 (the walkthrough) pending
 
 ## Decisions
 
@@ -488,6 +488,20 @@ slices 3/4 committed (slice 1: engines 4ad76e6, layout b55d744; slice 2: layout 
 - capability-vllm: per-purpose sweeps run one host at a time; rejected: both hosts at once from the laptop.
 - capability-vllm: slices are (1) hosts, PR, root steps, staging, helpers and the llama.cpp phase with its two-host cell; (2) the vLLM phase, its two-host cell and the restore; (3) the finding and layout document; (4) the architect's walkthrough; rejected: the llama.cpp phase in slice 2.
 - capability-vllm: the walkthrough runs on the Framework (three vLLM rows started on ROCm 10.0, the vision start timed, both pools read, vision level 1 rerun as its own cell, llama.cpp restored); rejected: gb10-2.
+- capability-vllm (BUILD, escalation 1): Claude Code on the laptop reaped the llama.cpp two-host cell's background shell about a minute in, for low laptop memory, before any result was written; the architect freed memory and answered "b": rerun once with the reaper left on, and drop the cell on both engines if it is reaped again. The rerun completed. The reaped run's partial logs are kept apart in `.state/measure/<host>/reaped-two-2026-11-11/` (the architect).
+- capability-vllm (BUILD): the vLLM two-host cell ran after a check of the laptop's memory (20.76 GiB available, 9.49 GiB at its lowest during the cell) and was not reaped.
+- capability-vllm (BUILD, spec gap): the audio probe's rerun at 22:18:10Z recorded no `tailscale ping` of its own; the probes' pings at 22:17:16Z, 54 s earlier, stand as its path.
+- capability-vllm (BUILD, spec gap): the `-rocm72` fallback image and its audio image were staged and checked ahead of need, beyond Behavior 4's list, so Behavior 8's fallback could run without a download. The fallback didn't run, and both images stay on the Framework.
+- capability-vllm (BUILD): the steps outside the cells (starts, probes, loads, idle reads, the restore) ran on both hosts at once; the cells ran one host at a time, except the two-host cells.
+- capability-vllm (BUILD): the warm-up is one short request a row ("Say hello in one sentence." or one embedding input), sent after the probes.
+- capability-vllm (BUILD): granite chose ROCM_ATTN on the Framework, for encoder-only attention. The #62697 gate names the Gemma rows only, so it didn't stop the phase; the finding records the backend.
+- capability-vllm (BUILD): the Framework's idle and after-cell reads now follow a page-cache drop, through the new sudoers rule at `/usr/bin/sysctl` (the GB10s' names `/usr/sbin/sysctl`); the framework task read the Framework without one.
+- capability-vllm (BUILD): the engines PR (4ad76e6) pins the official images by tag, with their digests only in the audio Dockerfile, which builds on them, and in a `vllm.env` comment; it serves the rocm flavor's default tag, the same image as `-rocm100`, rather than naming `-rocm100`; `VLLM_ROCM_BUILD` accepts only the named fallback, `rocm72`; and "any vLLM container" means every container a row names, plus `vllm`.
+- capability-vllm (BUILD, standards review): `vllm_remove_images` keeps every image a container was created from and removes the other official images, so an update removes a `-rocm72` staged ahead of need. bb68cbd says so in a comment and leaves the behavior unchanged.
+- capability-vllm (BUILD): two measure-lib fixes: c881c29 (slice 2) stops vLLM's readout counting "parse" inside "sparse", which ROCm's `sparse_attn_indexer` warning names, as a parser line; 88c6b2f (standards review) makes a GPU or host the helpers can't read report none or an error, never 0 or no container.
+- capability-vllm (BUILD, standards review): throwaway Python helpers (`imports.py`, `mkprobes.py` and an inline `python3 -` edit) ran untracked, against STANDARDS.md's rule that no Python is authored; nothing tracked depends on them, and the finding says so (760cfc7).
+- capability-vllm (BUILD): after the reviews, gb10-2's and the Framework's clones moved to bb68cbd, a comment-only change; every figure was measured at 4ad76e6.
+- capability-vllm (BUILD): the Framework's system memory came closest to its floor during the vLLM vision sweep, 0.76 GiB above 12.5 GiB, under the 0.60, 0.18 and 0.03 fractions. It is reported as found; nothing was rerun or changed.
 
 ## Pending edits
 
@@ -513,3 +527,4 @@ slices 3/4 committed (slice 1: engines 4ad76e6, layout b55d744; slice 2: layout 
 - coordinator · intake note (ai-hosting.md, experiment.hosting): for the agent, the architect accepts a longer cold start in exchange for better concurrency and overall performance, and finds vLLM the more attractive agent engine, chiefly for its concurrency (spike-model-layout `docs/findings/agent-vllm.md`, the conclusion and N).
 - spike-model-engines · intake note: `docs/engines/vllm/models.md` and `docs/engines/vllm/api.md` (outside host/) still describe v0.32.0 and list neither the `gpt-oss-120b-agent` nor the `gpt-oss-120b-agent-fp8` row (spike-model-layout `docs/findings/agent-vllm.md`, N).
 - coordinator · intake note (ai-hosting.md, experiment.hosting): gpt-oss-120b's FP8 KV cache on vLLM runs uncalibrated at scale 1.0, and an accuracy check of the FP8 row against the BF16 row would settle the agent row. That check is a new tool, so it belongs to a future task's plan round (spike-model-layout `docs/findings/agent-vllm.md`, E, N).
+- spike-model-engines · intake note: the vLLM guides in `docs/engines/vllm/` (README.md, setup.md, models.md, api.md, update.md, uninstall.md; outside host/) still describe one `vllm` container on port 8000. They don't cover a row's own container, port and image (capability-vllm's host/ change, 4ad76e6), `VLLM_ROCM_BUILD` and the `-rocm72` fallback, building the Framework's audio image, or the Framework's ufw route rules for ports 8001 and 8002, and they list none of the six capability rows (spike-model-layout `docs/findings/capability-vllm.md`, A.2, A.3, N).
