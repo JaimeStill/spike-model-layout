@@ -134,6 +134,21 @@ instead (`--argjson level <i>`, default the first): the gap between requests, th
 request start to the first streamed chunk, the streaming time, and the audio bytes. Medians and
 percentiles interpolate linearly between the two nearest ranks.
 
+## Reading the capacity cell: `capacity.jq` and `readouts.awk`
+
+`levels.jq` reads the capacity cell (`agent-vllm-capacity.yaml`) as one level's medians.
+[`capacity.jq`](capacity.jq) reads it a request at a time, in order of start: each request's
+status, start from the first's, TTFT, latency, prompt tokens and output tokens against the
+scenario's 256, then the counts, TTFT and latency medians and extremes, and the spread of the
+starts. [`readouts.awk`](readouts.awk) reads the readouts `watch` printed every 30 s (a step's
+output, or the measure log's lines for the cell): the highest running, waiting and KV cache usage,
+and the preemptions between the first and last counters line, since vLLM counts from its start.
+
+```sh
+jq -r -f bench/capacity.jq .state/measure/gb10-1/agent-vllm-b-cap.json
+awk -f bench/readouts.awk .state/agent-vllm/b-cap.out
+```
+
 ## Reading the router log: `srvtimes.awk`
 
 [`srvtimes.awk`](srvtimes.awk) reads llama-server's router log (`docker logs --timestamps llama`,
