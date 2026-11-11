@@ -27,7 +27,8 @@ and what context and how many concurrent sessions does each placed model hold?
    table each placement is computed from.
 3. Context × sessions per placed model: the concurrent multi-turn sessions (agent) or requests
    (vision, audio, embedding) each placed model holds at its context, up to its knee or speed
-   floor, by output tok/s, TTFT and inter-token latency.
+   floor, by output tok/s, TTFT and inter-token latency, on llama.cpp, and on vLLM in containers
+   with each model in its own process.
 4. Full set against role split: set A on one GB10, against the roles split across both GB10s
    (one serves the agent model alone; the other serves vision, audio and embedding, with no
    agent), requests directed to a host by capability; the sessions and requests each holds, the
@@ -35,9 +36,12 @@ and what context and how many concurrent sessions does each placed model hold?
 5. The Framework's role: a second capability host beside gb10-2, chosen from item 4's findings
    over overflow for the full set or for the agent, serving vision, audio and embedding (set A's
    capped 4-slot 26B-A4B and E4B, and granite); what it holds per purpose, and what the split
-   plus the Framework holds against the split alone.
-6. The agent model alone on vLLM, in a container, against llama.cpp on one GB10, in one session,
-   at the agent's load target: speed, TTFT under multi-turn load, memory, and cold start.
+   plus the Framework holds against the split alone, on llama.cpp, and on vLLM (ROCm) in
+   containers with each model in its own process.
+6. The agent model alone on vLLM v0.33.0, in a container, in two rows (BF16 KV at
+   gpu-memory-utilization 0.80; FP8 KV at fixed bytes sized for 1,179,648 tokens), against
+   llama.cpp's agent-only section on one GB10, in one session, at the agent's load target: speed,
+   TTFT under multi-turn load, memory, and cold start.
 7. On demand against resident: each model's cold load and first-request latency through
    llama.cpp's router, against the memory it frees, and which purposes can load on demand.
 8. Two-node serving over QSFP: gpt-oss-120b across both GB10s (vLLM with Ray, in containers)
@@ -87,6 +91,8 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
   vision, audio and embedding, [`docs/findings/framework.md`](../docs/findings/framework.md).
 - **The vLLM agent comparison** against llama.cpp on gb10-1,
   [`docs/findings/agent-vllm.md`](../docs/findings/agent-vllm.md).
+- **The vLLM capability comparison** against llama.cpp on gb10-2 and the Framework: vision, audio
+  and embedding, each in its own process.
 - **On-demand serving** through llama.cpp's router.
 - **Two-node serving** over QSFP with vLLM and Ray.
 - **The layout document:** [`docs/layout.md`](../docs/layout.md), living, finalized by the answer.
@@ -120,13 +126,19 @@ and load targets are agreed in its task's own plan round.
    gb10-1 under its floor under vision load (the footprint finding, section K).
 4. `framework`: the Framework as a second capability host beside gb10-2, serving set A's capped
    26B-A4B and E4B and granite, against the split alone in one session (evidence 3, 5).
-5. `agent-vllm`: gpt-oss-120b on vLLM v0.33.0 in a container against llama.cpp on the agent GB10,
-   in one session (evidence 6).
-6. `on-demand`: llama.cpp's router loading models on demand against keeping them resident, on
+5. `agent-vllm`: gpt-oss-120b on vLLM v0.33.0 in a container, in two rows (BF16 KV at 0.80; FP8
+   KV at fixed bytes sized for 1,179,648 tokens), against llama.cpp's agent-only section on
+   gb10-1, in one session (evidence 6).
+6. `capability-vllm`: vision (Gemma 4 26B-A4B), audio (E4B) and embedding (granite) on vLLM
+   v0.33.0 in containers, each in its own process, alone and together, on gb10-2 and on the
+   Framework (vLLM ROCm), against llama.cpp's figures from role-split and framework; a pull request
+   to spike-model-engines' `host/` first gives each row its own container, port and memory fraction
+   (evidence 3, 5, beside 6).
+7. `on-demand`: llama.cpp's router loading models on demand against keeping them resident, on
    each host (evidence 7).
-7. `two-node`: gpt-oss-120b across both GB10s over QSFP with vLLM and Ray, against one node; Ray
+8. `two-node`: gpt-oss-120b across both GB10s over QSFP with vLLM and Ray, against one node; Ray
    is the task's one new tool (evidence 8).
-8. `answer`: `docs/layout.md` finalized, the routing requirements for spike-model-gateway, README
+9. `answer`: `docs/layout.md` finalized, the routing requirements for spike-model-gateway, README
    "The answer", and the answer section in `ai-hosting.md` (evidence 9).
 
 ## References
