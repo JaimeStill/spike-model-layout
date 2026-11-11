@@ -328,8 +328,8 @@ saved logs (`vllm-first-start.log`, `vllm-bf16-run.log`, `vllm-fp8-start.log`):
 
 v0.32.0's round 5 rerun of the same row read 28.35 GiB and 544,172 tokens (cited); the BF16 row's
 cache moves with the start (L.1). The FP8 row's 1,733,910 tokens are the measured figure; the
-row's 1,179,648 were computed in the brief from half of v0.32.0's bytes a token (27,969 bytes, c:
-32,993,476,982 / 1,179,648). It holds 47% more (c).
+row's 1,179,648 were computed in the brief from half the mean of v0.32.0's two logged accountings
+(55,937.83 (c)), 27,969 bytes a token (c: 32,993,476,982 / 1,179,648). It holds 47% more (c).
 
 **Where 32,993,476,982 comes from.** It is the row's chosen sizing input, computed before the
 session, not a measured figure. The scratch computation that produced it wasn't quoted; this awk
@@ -342,8 +342,21 @@ cited): the mean of their bytes a token (55,936.40 and 55,939.26, c), halved for
 awk 'BEGIN { g = 1024 ^ 3; a = 25.71 * g / 493523; b = 28.35 * g / 544172; printf "%.0f\n", (a + b) / 2 / 2 * 1179648 }'
 ```
 
-The FP8 row keeps `--gpu-memory-utilization 0.80` beside `--kv-cache-memory-bytes`: vLLM sizes the
-cache from the bytes, and the 0.80 still sets the startup free-memory check.
+The FP8 row keeps `--gpu-memory-utilization 0.80` beside `--kv-cache-memory-bytes`. vLLM sizes the
+cache from the bytes, not from the 0.80; the FP8 start log says so (`vllm-fp8-start.log`, line 66):
+
+```
+Initial free memory 114.99 GiB, reserved 30.73 GiB memory for KV Cache as specified by kv_cache_memory_bytes config and skipped memory profiling. This does not respect the gpu_memory_utilization config.
+```
+
+The 0.80 still gates the startup free-memory check. In v0.33.0's source (checked at the tag on
+2026-11-11, not measured), `request_memory` computes the requested memory as total × 0.80 and
+raises "Free memory on device … is less than desired GPU memory utilization" when free memory is
+below it (`vllm/v1/worker/utils.py:716-772`, the check at 761-770). The worker calls it at device
+start, before any KV sizing (`vllm/v1/worker/gpu_worker.py:542`). The bytes skip only the profiling
+and the cache sizing: the worker returns `kv_cache_memory_bytes` with the message above
+(`gpu_worker.py:656-681`), and the option's docstring says it "ignores gpu_memory_utilization"
+(`vllm/config/cache.py:374-381`).
 
 ## E. Backends (Behaviors 6, 11)
 
@@ -489,8 +502,9 @@ cache's tokens.
 
 ### I.2 The premise changed
 
-The brief and the FP8 row's sizing rest on v0.32.0's per-token accounting: 25.71 GiB for 493,523
-tokens on gb10-1, **55,936 bytes a token (c)**, about 3.8 sessions of 131,072 (c). On v0.33.0 the
+The brief rests on v0.32.0's per-token accounting: 25.71 GiB for 493,523 tokens on gb10-1,
+**55,936 bytes a token (c)**, about 3.8 sessions of 131,072 (c). The FP8 row's sizing rests on
+half the mean of v0.32.0's two logged accountings (55,937.83 (c); D). On v0.33.0 the
 same model and BF16 cache count **~38,058 bytes a token (c)**, 32% less (c), and FP8 counts
 **~19,028 (c)**, half of BF16's (c). So:
 
