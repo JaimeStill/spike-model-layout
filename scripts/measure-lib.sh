@@ -182,7 +182,7 @@ _measure_engine() {
   fi
 }
 _measure_container() {
-  local name
+  local listed name
   if [[ -n ${MEASURE_CONTAINER-} ]]; then
     echo "$MEASURE_CONTAINER"
     return
@@ -191,8 +191,12 @@ _measure_container() {
     return
   fi
   # Each container as `<running> /<name> <host port>...`, the newest first, as docker lists them.
-  name=$(ssh "$MEASURE_HOST" 'docker container ls --all --quiet | xargs -r docker container inspect --format "{{.State.Running}} {{.Name}}{{range .HostConfig.PortBindings}}{{range .}} {{.HostPort}}{{end}}{{end}}"' |
-    awk -v p="$MEASURE_PORT" '{ for (i = 3; i <= NF; i++) if ($i == p) { n = substr($2, 2)
+  # A host that can't be read is an error, never a host with no container on the port.
+  if ! listed=$(ssh "$MEASURE_HOST" 'set -o pipefail; docker container ls --all --quiet | xargs -r docker container inspect --format "{{.State.Running}} {{.Name}}{{range .HostConfig.PortBindings}}{{range .}} {{.HostPort}}{{end}}{{end}}"'); then
+    echo "$MEASURE_HOST's containers could not be read" >&2
+    return 1
+  fi
+  name=$(printf '%s\n' "$listed" | awk -v p="$MEASURE_PORT" '{ for (i = 3; i <= NF; i++) if ($i == p) { n = substr($2, 2)
         if ($1 == "true") { print n; found = 1; exit }; if (first == "") first = n } }
       END { if (!found && first != "") print first }')
   if [[ -n $name ]]; then
@@ -446,7 +450,7 @@ procs=$(ps -eo pid=,rss=,args= | awk '$3 ~ /(^|\/)llama-server$/ {
   print $1, $2, p, a }')
 card=
 for d in /sys/class/drm/card*/device; do
-  [ -r "$d/mem_info_gtt_total" ] && { card=$d; break; }
+  [ -r "$d/mem_info_gtt_total" ] && [ -r "$d/mem_info_gtt_used" ] && { card=$d; break; }
 done
 if command -v nvidia-smi >/dev/null; then
   kind=nvidia
@@ -532,7 +536,7 @@ procs=
 [ -z "$pids" ] || procs=$(ps -o pid=,rss=,comm= -p "$pids")
 card=
 for d in /sys/class/drm/card*/device; do
-  [ -r "$d/mem_info_gtt_total" ] && { card=$d; break; }
+  [ -r "$d/mem_info_gtt_total" ] && [ -r "$d/mem_info_gtt_used" ] && { card=$d; break; }
 done
 if command -v nvidia-smi >/dev/null; then
   kind=nvidia
@@ -550,15 +554,17 @@ if [ -z "$procs" ]; then
   echo "  none: the container runs no process"
 else
   awk -v kind="$kind" 'NR == FNR { if ($1 != "") { v[$1] = $2; g[$1] = $3 }; next }
-    { if (kind == "nvidia") { m = ($1 in v) ? sprintf("gpu %d MiB", v[$1]) : "gpu none"; tg += v[$1] }
+    { n += ($1 in v)
+      if (kind == "nvidia") { m = ($1 in v) ? sprintf("gpu %d MiB", v[$1]) : "gpu none"; tg += v[$1] }
       else if (kind == "amdgpu") {
         m = ($1 in v) ? sprintf("vram %d MiB, gtt %d MiB", v[$1], g[$1]) : "vram none, gtt none"
         tv += v[$1]; tg += g[$1] }
       else m = "no GPU read"
       tr += $2
       printf "  %s: pid %s, %s, rss %d MiB\n", $3, $1, m, $2 / 1024 }
-    END { if (kind == "nvidia") m = sprintf("gpu %d MiB", tg)
-          else if (kind == "amdgpu") m = sprintf("vram %d MiB, gtt %d MiB", tv, tg)
+    END { # No process in the GPU read is none, never 0 MiB.
+          if (kind == "nvidia") m = n ? sprintf("gpu %d MiB", tg) : "gpu none"
+          else if (kind == "amdgpu") m = n ? sprintf("vram %d MiB, gtt %d MiB", tv, tg) : "vram none, gtt none"
           else m = "no GPU read"
           printf "  container: %s, rss %d MiB\n", m, tr / 1024 }' \
     <(printf '%s\n' "$gpu") <(printf '%s\n' "$procs")
