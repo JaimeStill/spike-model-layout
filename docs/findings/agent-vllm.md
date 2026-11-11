@@ -44,6 +44,10 @@ It also found that:
 - Both rows answered the reasoning and tool-call probes, the reasoning in `reasoning`, not
   `reasoning_content` (J).
 
+The architect's walkthrough restarted the FP8 row and reran F-agent's level 4 as its own cell: the
+row's sizing (D) and its level 4 (F) reproduce, and the restore's load and idle pool match C's
+(L.4).
+
 It decides nothing.
 
 **The conclusion, as evidence (the architect's framing).** The architect agreed this framing of
@@ -77,11 +81,12 @@ hold 4 and 12; the BF16 row's knee is 6.71, so it holds 4 by the rule, though 8 
 **Which figures size the layout.** Production clients sit on the same direct network as the GPUs,
 so the layout is sized on LAN figures (role-split's decision). Every run with a recorded ping went
 direct on the LAN, 0 to 2 ms to gb10-1, so client-side and server-side figures both stand as LAN
-figures; the stack read and the staging, which measured nothing, recorded none (M).
+figures; the stack read and the staging, which measured nothing, recorded none, and nor did the
+architect's walkthrough, a reproduction (L.4, M).
 
 | Host | Serves at the end of the session |
 | --- | --- |
-| gb10-1 | `gpt-oss-120b-MXFP4-agent-only` (c 1,179,648, 16 slots, unified), freshly loaded in 48.4 s: 13.73 GiB available, read 16:54:09Z. The `vllm` container stopped (Exited (0)) on the FP8 row, its v0.33.0 image (d825baf9ce4b), its compile cache (178M) and gpt-oss-120b's safetensors kept. spike-model-engines' clone on the local `hosts` branch at c5251be |
+| gb10-1 | `gpt-oss-120b-MXFP4-agent-only` (c 1,179,648, 16 slots, unified), reloaded in the architect's walkthrough in 48.4 s: 13.66 GiB available, read 17:36:30Z with no cache drop (L.4); the restore's read before it, 13.73 GiB at 16:54:09Z. The `vllm` container stopped on the FP8 row (Exited (0) at the restore's read, 16:54:10Z; after the walkthrough, as its commands left it), its v0.33.0 image (d825baf9ce4b), its compile cache (178M) and gpt-oss-120b's safetensors kept. spike-model-engines' clone on the local `hosts` branch at c5251be |
 | gb10-2 | as the framework task left it: its 16-slot 26B-A4B and E4B and granite; clone on `main` at 21b5e8c. Read only, for the stack |
 | framework | as the framework task left it: set A's capped 26B-A4B and E4B and granite; clone on `main` at 21b5e8c. Read only, for the stack |
 
@@ -612,6 +617,141 @@ Each read is after the cell, the cache dropped (`after`): `memory`, then `footpr
 No cell fell under the floor. llama.cpp's RSS grew 2,358 → 3,219 MiB over L-agent, as role-split
 and framework found; vLLM's container RSS grew under 100 MiB a row.
 
+### L.4 The architect's walkthrough (slice 4)
+
+The architect ran slice 4 on gb10-1 at about 12:20-12:37 local (17:20-17:37Z), from their own
+shell. It starts the stopped `vllm` container on the FP8 row from a dropped page cache, reads its
+sizing and footprint, reruns F-agent's level 4 as its own cell,
+[`bench/role-split-walk-agent.yaml`](../../bench/role-split-walk-agent.yaml) (4 streams, 110 s,
+S-agent's 4-turn sessions; role-split's walkthrough cell, unchanged), and restores the agent-only
+section. It reproduces the FP8 row's sizing (D) and its level 4 (F).
+
+**Two records.** The commands before the helpers were sourced, the start and its timer, and the
+`docker logs` search ran in the architect's shell or in a shell on gb10-1, outside the step log;
+the architect pasted their output (`.state/agent-vllm/walkthrough-architect.txt`). `memory`,
+`footprint`, `cell`, `jq` and `load` are in gb10-1's step log
+(`.state/measure/gb10-1/2026-11-11.log`, from line 3063), and the cell's files are
+`.state/measure/gb10-1/agent-vllm-walk-f-agent-4.{json,log,watch.tsv,exit}` (`.exit` reads 0). No
+ping was recorded during the walkthrough.
+
+From the architect's paste, outside the step log (the `docker logs` search ran on gb10-1):
+
+```
+ssh gb10-1 docker stop llama
+ssh gb10-1 sudo -n /usr/sbin/sysctl vm.drop_caches=3
+t0=$(date +%s); ssh gb10-1 docker start vllm
+until curl -sf -o /dev/null http://gb10-1:8000/health; do sleep 5; done; echo "start $(( $(date +%s) - t0 )) s"
+docker logs --since "$(docker inspect -f "{{.State.StartedAt}}" vllm)" vllm 2>&1 | grep -E "GPU KV cache size|Available KV cache memory|Model loading took|attention backend"
+```
+
+Then, in log order, local time, as the step log has them:
+
+```
+12:31:23  # the step helpers sourced for gb10-1 on port 8000: the log's "measure log for gb10-1
+          # (http://gb10-1:8000)" line; the paste: source scripts/measure-lib.sh gb10-1 8000
+12:31:23  export MEASURE_FLOOR_GIB=12.2
+12:31:27  memory
+12:31:27  footprint
+12:31:40  cell agent-vllm-walk-f-agent-4 role-split-walk-agent openai/gpt-oss-120b openai/gpt-oss-120b
+12:33:57  jq -r --arg purpose agent -f bench/levels.jq .state/measure/gb10-1/agent-vllm-walk-f-agent-4.json
+12:34:07  ssh gb10-1
+          # an interactive shell on gb10-1 until 12:34:28
+12:34:34  source scripts/measure-lib.sh gb10-1
+12:35:02  curl -sf -o /dev/null http://gb10-1:8080/health
+12:35:11  load gpt-oss-120b-MXFP4-agent-only
+12:36:00  sleep 30
+12:36:30  memory
+12:37:19  clear
+```
+
+The step log records the shell at 12:34:07 only as `ssh gb10-1`; the architect's paste gives the
+swap as `ssh gb10-1 docker stop vllm; ssh gb10-1 docker start llama`. The `curl` at 12:35:02 is in
+the log and not in the paste.
+
+**The start** (`docker start vllm`, the container started 17:21:04Z):
+
+| | FP8 start (C, D) | BF16 timed start (C, D) | Walkthrough |
+| --- | --- | --- | --- |
+| How it started | `host/engines vllm update`, compiling afresh | `docker restart vllm`, compile cache warm | `docker start vllm`, compile cache warm |
+| Start | 530.7 s | 503.1 s | **518 s** to /health 200, the laptop's clock |
+| Model loading | 66.14 GiB in 460.83 s | 66.14 GiB in 456.81 s | 66.14 GiB in **490.44 s** |
+| Compile | afresh, 8.58 s | "Directly load AOT compilation" | "Directly load AOT compilation" from `96b6f1cb…`, FP8's saved function |
+| KV cache | 30.73 GiB reserved; 1,733,910 tokens, 13.23x | 30.0 GiB; 846,411 tokens, 6.46x | **30.73 GiB reserved; 1,733,910 tokens, 13.23x** |
+| Initial free memory | 114.99 GiB | – | 115.05 GiB |
+| CUDA graphs | 0.48 GiB | 1.41, then 0.18 GiB | 0.49 GiB, in 5 s |
+| Backends (E) | FlashInfer attention; Marlin MXFP4 MoE | – | FlashInfer attention; Marlin MXFP4 MoE |
+
+The 518 s is whole seconds on the laptop's clock, with `/health` polled every 5 s from before
+`docker start` returned; the finding's starts are timed by `vllm_wait`. It falls between the BF16
+row's 503.1 s and the FP8 row's 530.7 s; it is 12.7 s shorter than the FP8 start (c), which
+compiled. The weight load is the part that moves: 490.44 s here against 460.83 and 456.81 s (29.61
+and 33.63 s more, c), and 478.04 s on the BF16 first start, the same 66.14 GiB each time. That is
+variance between starts, not a finding. The sizing reproduces exactly: the same reserved bytes, the
+same tokens and concurrency, the same backends. The pool wasn't read before the start, and no
+sampler ran during it, so L.2's lowest during the FP8 start (12.52 GiB) wasn't re-read.
+
+**The idle read** (17:31:27Z, `memory` and `footprint`, about 2 min after /health 200):
+
+| | FP8 idle (C, L.3) | Walkthrough |
+| --- | --- | --- |
+| Before the read | one warm-up request, 30 s idle, a page-cache drop | none: straight after the start, no warm-up, no drop |
+| Pool (`memory`) | 13.88 GiB | **15.19 GiB**, 2.99 above the floor (c) |
+| Cached (`footprint`'s pool line) | 0.93 GiB | 15.19 GiB |
+| Container GPU / RSS | 102,085 / 3,806 MiB | 101,119 / 3,115 MiB |
+
+The walkthrough's pool reads 1.31 GiB more than the finding's FP8 idle (c), and its GPU figure 966
+MiB less (c). The difference in method likely accounts for both: the finding's read followed a
+warm-up request, 30 s idle and a page-cache drop; the walkthrough's came straight after the start,
+with none of the three. The GPU memory the warm-up's activations leave allocated is the likely
+cause of the GPU figure's difference. Neither was isolated: no read here separates the warm-up, the
+idle time or the drop, so this records the difference, not its cause. The FP8 row's idle figure
+stays C's 13.88 GiB.
+
+**The cell** (17:31:40-17:33:54Z under `watch`; GuideLLM's 110 s), from `bench/levels.jq`, against
+F-agent's level 4 (F) read from `agent-vllm-f-agent.json` by the same program:
+
+| | F-agent, level 4 (F) | Walkthrough |
+| --- | --- | --- |
+| Turns ok / errored / incomplete | 14 / 0 / 4 | 13 / 0 / 4 |
+| Output tok/s, completed (every-token) | 65.16 (74.38) | 60.51 (74.28) |
+| Requests a second | 0.127 | 0.118 |
+| TTFT median | 566 ms | 564 ms |
+| ITL median / p95 | 49.55 / 51.27 ms | 49.85 / 55.08 ms |
+| Request latency median / p90 | 25.91 / 31.89 s | 26.04 / 33.05 s |
+| Prompt tok/s | 1168 | 1066 |
+| Floor (ITL ≤100 ms) | meets | meets |
+
+The completed figure differs by one turn that finished inside the 110 s window (c: 14 × 512 / 110
+= 65.16; 13 × 512 / 110 = 60.51), and requests a second and prompt tok/s count completed turns too.
+The per-token figures reproduce: every-token 0.10 tok/s lower (c), TTFT 2 ms lower (c), ITL median
+0.30 ms higher (c). The ITL p95 read 3.81 ms higher (c), still about half the floor. The step log's
+summary line reads the same: 13 ok, 0 errored, 4 incomplete of 17; 60.51 tok/s completed, 74.28
+every-token; TTFT median 564 ms; ITL median 49.85 ms.
+
+**Errors and memory through the cell.** The readout since 17:31:41Z: ERROR lines 0, Harmony or parser
+errors and warnings 0, HarmonyError lines 0, responses ≥400 0; vLLM's counters: 13 requests ok, error
+0, preemptions 0. `watch`'s 13 samples held from 15.24 GiB (15603 MiB, 17:31:51Z) to the lowest,
+**15.06 GiB (15426 MiB, 17:33:43Z)**, 2.86 above the floor (c); `readout`'s `memory` just after,
+with no drop, read 15.06 GiB. F-agent's lowest, over its five levels, was 13.96 GiB (F); like the
+idle read, the walkthrough's cell started from the higher, undropped pool.
+
+**The restore** (`load gpt-oss-120b-MXFP4-agent-only`, 17:35:11Z): loaded in **48.4 s**, args
+`--no-cache-idle-slots --ctx-size 1179648 --checkpoint-min-step 4096 --cache-ram 0 --kv-unified
+--parallel 16`, as C's; after `sleep 30`, `memory` read **13.66
+GiB**, C's llama.cpp baseline exactly (13.73 on C's restore). The architect's sequence ran no
+page-cache drop before this read, where C's reads each followed one.
+
+**What it establishes.** The FP8 row's sizing reproduces exactly, 30.73 GiB reserved for 1,733,910
+tokens and 13.23x, with FlashInfer and Marlin, and so does its level 4: the floor met, TTFT, ITL and
+every-token output within run noise, no errors and no preemption. The start, 518 s, lies inside the
+finding's range; its weight load varies by tens of seconds between starts. The idle pool read 1.31
+GiB higher with no warm-up and no drop, a difference of method not isolated here. The restore's load
+and idle pool match C's.
+
+gb10-1 ends in Behavior 14's state again: the agent-only section loaded on llama.cpp, the `vllm`
+container stopped on the FP8 row. No `docker ps` was read after the walkthrough, so the container's
+state is as the commands left it.
+
 ## M. Every run
 
 | Run | Tool and configuration | Load | Duration | Path | Decision it informs |
@@ -633,6 +773,7 @@ and framework found; vLLM's container RSS grew under 100 MiB a row.
 | F-agent | as B-agent, FP8 row | as L-agent | 110 s a level, 591 s | direct, 1 ms | FP8's sessions at the floor (F, G) |
 | F-cap | as B-cap, FP8 row | as B-cap | 225 s | direct, 2 ms | whether FP8 holds 8 at once (H) |
 | Restore | `docker stop vllm`; `docker start llama`; `load`; 30 s idle; read | none | 48.4 s load | direct, 2 ms | Behavior 14's state |
+| Walkthrough (slice 4) | the architect's shell: a cache drop, `docker start vllm` on the FP8 row, timed to /health 200; `memory` and `footprint`; `cell`, `bench/role-split-walk-agent.yaml`, FP8 row; `docker stop vllm`; `docker start llama`; `load`; 30 s idle; `memory` | 4 streams, S-agent's 4-turn sessions | 518 s start; 110 s cell; 48.4 s load | no ping recorded | the FP8 row's sizing and level 4, reproduced (L.4) |
 
 Every cell ran under `watch`, memory sampled every 10 s, capped at 10 min, floor 12.2 GiB
 (`MEASURE_FLOOR_GIB`, set by `step.sh`).
@@ -647,7 +788,8 @@ lines and the floor `step.sh` exported stay in the log. A step file's `{ date -u
 ping -c 1 gb10-1; } 2>&1 | tee -a …/ping-2026-11-11.txt` is one line, which the trace prints as
 three, in the order the shell started them; a pipeline prints each of its commands. gb10-2's and
 the Framework's logs for the day hold only their stack reads (`stack-gb.sh`, `stack-fw.sh`), the
-same commands as gb10-1's first step.
+same commands as gb10-1's first step. The
+architect's walkthrough, in the same log from 12:31, is quoted in L.4.
 
 ```
 09:42:31  source /home/jaime/experiments/spike-model-layout/.state/agent-vllm/step-files/stack-gb.sh
