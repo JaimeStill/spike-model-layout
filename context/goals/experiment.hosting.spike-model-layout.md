@@ -264,7 +264,7 @@ Door          two-way: rows, pins and suite changes revert by a commit
 
 ## Progress
 
-slices 2/5 committed · standards — · spec — · editor —
+slices 3/5 committed · standards — · spec — · editor —
 
 ## Decisions
 
@@ -541,6 +541,9 @@ slices 2/5 committed · standards — · spec — · editor —
 - vllm-layout (BUILD): the Framework's root is LUKS-encrypted; its reboot needed the architect's passphrase at the console, so it does not return unattended and cannot be rebooted remotely as the GB10s can (Behavior 11 holds for the GB10s only) and its timeline includes the passphrase. Unlocking without a person (TPM2 enrollment, a keyfile) or remotely (SSH in the initramfs) is a security decision outside the task; recorded as an intake note.
 
 - vllm-layout (BUILD): the Framework stays on Omarchy (the architect), after weighing headless Ubuntu Server (parity with the GB10s' Ubuntu base, an LTS cadence) against a newer kernel for gfx1151, the desktop, and re-measuring; the reboot needs a disk-unlock method on either OS.
+
+- vllm-layout (BUILD): the reboots: gb10-2 3 min 49 s from reboot to vision serving, gb10-1 8 min 58 s to the agent row, both unattended; the Framework 98 s from down to audio and granite serving, after the architect's LUKS passphrase. After it the Framework reads GTT 120,259,084,288 bytes, no amdgpu.conf, no gttsize line. gb10-1's cold start stayed above its floor (lowest 14.94 GiB; the AOT compile cache loaded). gb10-2's E4B and granite safetensors removed (15.21 GiB).
+- vllm-layout (BUILD): the standing-layout cell, all three hosts at once for 240 s, met every floor: agent 4 ITL 48.13 ms; vision 4 4.49 s (212/212); audio 4 RTFx 5.78; embedding at 34 req/s 17,442 tok/s. Embedding ran at the gateway's rate, not closed-loop, as the layout's standing condition; the agent cell reused role-split-mixed-agent.yaml at 4.
 
 ## Pending edits
 
