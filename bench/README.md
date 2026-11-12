@@ -59,6 +59,15 @@ the target in `GUIDELLM__SPEC__BACKEND__TARGET`. Each file's header gives its lo
   at 8 the audio file's 876 rows can run out before 240 s, and its JSON's duration says when):
   `cell vllm-layout-fw-stress-a8r34-embed vllm-layout-embed-rate-4x ...`, which sets the
   Framework audio row's cap.
+- The same task's standing-layout cell (Behavior 12), all three hosts at once for 240 s, adds no
+  file: four processes started together, each with the helpers sourced for its host and port.
+  The agent runs `role-split-mixed-agent.yaml` (`vllm-layout-agent.yaml`'s S-agent sessions, at
+  240 s) at 4 on gb10-1 (`cell vllm-layout-standing-agent role-split-mixed-agent
+  openai/gpt-oss-120b openai/gpt-oss-120b`); vision `role-split-mixed-vision.yaml` at 4 on gb10-2
+  (`nvidia/Gemma-4-26B-A4B-NVFP4`); audio `role-split-mixed-audio.yaml` at 4 on the Framework's
+  8001; and embedding `vllm-layout-embed-rate-4x.yaml` on its 8002, since the layout rate-limits
+  embedding at the gateway, so its standing load is the admitted rate, not closed-loop streams.
+  Each JSON is read with `levels.jq` for its purpose.
 
 ## Role-split's cells
 

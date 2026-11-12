@@ -1,6 +1,7 @@
 # vllm-layout's Framework placement cells after escalation 3, the embedding process: one of two
 # GuideLLM processes started together (the other role-split-mixed-audio.yaml at 4 streams, and at 8
-# in the stress cell that sets the audio row's cap), the
+# in the stress cell that sets the audio row's cap; the standing-layout cell runs it beside
+# all three hosts' targets, the rate the gateway admits), the
 # Framework's granite row (granite-embedding-english-r2-framework) at a constant 34 requests a
 # second for 240 s, under the 10 min cap: 4x the floor: 34 x 512 = 17,408 prompt tok/s, so the cell asks
 # whether audio holds beside an embedding load at that rate, where the concurrent cells drove
