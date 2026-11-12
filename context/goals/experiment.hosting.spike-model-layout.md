@@ -264,7 +264,7 @@ Door          two-way: rows, pins and suite changes revert by a commit
 
 ## Progress
 
-slices 1/5 committed · standards — · spec — · editor —
+slices 2/5 committed · standards — · spec — · editor —
 
 ## Decisions
 
@@ -531,6 +531,9 @@ slices 1/5 committed · standards — · spec — · editor —
 
 - vllm-layout (BUILD): the Framework stress cell, audio 8 + embedding at 34 req/s, missed audio by 0.06 (RTFx 4.94, 406/876 >= 5; embedding met, 17,442 tok/s), so audio's cap is 4; host/ 8f981ee removes gb10-2's audio row, the Framework's 12B and BF16 rows, and caps the Framework's audio at 4.
 - vllm-layout (BUILD, escalation 4): the BF16 26B-A4B mmmu_val reference hit its 45 min cap at 869/900 (lm-eval saves only at the end; nothing kept). The architect answered: rerun it once with a 60 min cap and identical settings, then the paired test against NVFP4, the BF16 weights removed, and host/ delivered.
+
+- vllm-layout (BUILD): the BF16 26B-A4B reference finished in 46:24 under the 60 min cap: mmmu_val 0.6178 against NVFP4's 0.6111 (b 78, c 72, p 0.68; 0 prompt mismatches), so NVFP4's loss is not significant (CUDA against ROCm recorded as a limit); the BF16 weights (51.6G) are removed.
+- vllm-layout (BUILD): host/ 8f981ee is delivered to gb10-2 (vision alone, 16, 0.40; idle 65.72 GiB) and the Framework (granite 128, 0.03; audio 4, 0.18; idle GTT 89.50, system 88.02 GiB); gb10-1 stays on 3efb444, whose rows 8f981ee keeps.
 
 ## Pending edits
 
