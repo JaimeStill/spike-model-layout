@@ -1,6 +1,6 @@
 # goal · experiment.hosting.spike-model-layout
 
-- **State:** building
+- **State:** brief ready
 - **Task:** capability-vllm
 - **Branch:** capability-vllm
 
@@ -297,7 +297,7 @@ Door          two-way: the rows, suite changes and audio image revert by
 
 ## Progress
 
-slices 3/4 committed (slice 1: engines 4ad76e6, layout b55d744; slice 2: layout c881c29; slice 3: layout b2f432c) · standards done (88c6b2f, 760cfc7, bb68cbd) · spec done, gaps closed (8a1e147; the audio probe rerun's path and the staged `-rocm72` images, Decisions) · editor done · slice 4 (the walkthrough) pending
+slices 4/4 committed (slice 1: engines 4ad76e6, layout b55d744; slice 2: layout c881c29; slice 3: layout b2f432c) · standards done (88c6b2f, 760cfc7, bb68cbd) · spec done, gaps closed (8a1e147; the audio probe rerun's path and the staged `-rocm72` images, Decisions) · editor done · slice 4 recorded (c8a1be1)
 
 ## Decisions
 
