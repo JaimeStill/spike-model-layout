@@ -264,7 +264,7 @@ Door          two-way: rows, pins and suite changes revert by a commit
 
 ## Progress
 
-slices 3/5 committed · standards — · spec — · editor —
+slices 4/5 committed · standards — · spec — · editor —
 
 ## Decisions
 
