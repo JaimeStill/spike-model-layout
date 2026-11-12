@@ -518,6 +518,9 @@ slices 1/5 committed · standards — · spec — · editor —
 
 - vllm-layout (BUILD, escalation 1): on gb10-2 without granite, vision and audio held alone at 4 (4.68 s; RTFx 6.36) but the pair missed: 4+4 audio RTFx 3.19 (vision 9.88 s), 8+8 both. The architect answered: (1) uneven pair cells (vision 4 + audio 2, 2 + 2, 2 + 4, 240 s each) and each row capped at the highest pair where both hold, the 4/4 target reported unmet on one host; (2) one Framework cell, audio 4 beside granite 16, as evidence for moving audio there, the placement unchanged unless the architect changes it; (3) mmmu_val on NVFP4 runs now at num_concurrent 16. The architect asked that every scenario that could give the best performance be evaluated, so gb10-2 also runs vision alone at 8 and 16 (vision-only capacity, should audio move).
 
+- vllm-layout (BUILD): gb10-2's uneven pairs all missed audio (v4a2 3.31, v2a2 3.36, v2a4 3.24; vision met in each); vision alone held 8 (6.11 s) and 16 (9.64 s, 133/144).
+- vllm-layout (BUILD, escalation 2): if audio 4 beside granite 16 holds on the Framework, the layout is gb10-1 agent, gb10-2 vision, the Framework audio + embedding, with no vision row there (the architect). The architect answered: (1) the 12B row, its sweep and mmmu, the failover cell and the Framework's standing vision are dropped; (2) the BF16 26B-A4B mmmu_val run stays as NVFP4's paired reference, then its weights are removed; (3) gb10-2's vision cap is 16, its audio row stopped and removed; (4) one stress cell, audio 8 + granite 16, sets audio's cap; (5) if audio misses beside granite, the session stops for the architect. Part B runs in stages, reporting after each.
+
 ## Pending edits
 
 - coordinator · ai-hosting.md "Hosts and access": the drop-caches rule on both GB10s.
