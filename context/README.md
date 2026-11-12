@@ -4,9 +4,9 @@ spike-model-layout is where the workstations' three memory pools get their layou
 gb10-1, gb10-2 and the Framework each serve, at what context, and for how many concurrent
 sessions. It measures each placement with GuideLLM in capped runs on all three hosts, weighs a
 full set on one GB10 against splitting the roles across both GB10s, compares vLLM with llama.cpp,
-and tunes the layout the architect chose: vLLM instances, one model each, across gb10-1 and
-gb10-2, with the Framework as backup compute. It gives the layout v1.ai.hosting specifies as
-evidence. The spike decides nothing itself.
+and tunes the layout the architect chose: vLLM instances, one model each, gb10-1 serving the
+agent, gb10-2 vision, and the Framework audio and embedding. It gives the layout v1.ai.hosting
+specifies as evidence. The spike decides nothing itself.
 
 The spike is the sub-goal `experiment.hosting.spike-model-layout` in the coordinator's roadmap,
 `standards-lab/context/roadmap.toml`, where its tasks live. Its question is framed in
@@ -18,6 +18,47 @@ spike-hosting-upgrades.
 
 How are models placed across the three workstations' memory pools to make the best use of memory,
 and what context and how many concurrent sessions does each placed model hold?
+
+## The answer
+
+The answer is evidence; the architect chose the layout. Each model runs in its own vLLM v0.33.0
+instance, one heavy purpose to a GPU, and the standing layout met every purpose's floor at the
+load targets with all three hosts at once
+([`docs/findings/vllm-layout.md`](../docs/findings/vllm-layout.md), J):
+
+| Host | Purpose and model | Sequences, context | Load target | Measured at the target, all hosts at once | Holds alone |
+| --- | --- | --- | --- | --- | --- |
+| gb10-1 | agent: gpt-oss-120b, FP8 KV | 12 × 131,072 | 4 sessions | ITL 48.13 ms | 12 sessions |
+| gb10-2 | vision: Gemma 4 26B-A4B NVFP4 | 16 × 8,192 | 4 requests | 4.49 s | 16 requests |
+| framework | audio: Gemma 4 E4B BF16 | 4 × 8,192 | 4 requests | RTFx 5.78 | 4, beside embedding |
+| framework | embedding: granite-embedding-english-r2 | 128 × 8,192 | at most 34 req/s | 17,442 prompt tok/s | knee at 16 streams, 98,325 tok/s |
+
+The evidence behind each placement:
+
+- **Purposes apart, not memory, decide the layout.** Every miss the spike measured was purposes
+  sharing one GPU's compute and bandwidth, with memory far above the floors: set A on one GB10, the
+  capability hosts on llama.cpp and on vLLM, and audio beside vision on gb10-2 at every pair level
+  ([role-split](../docs/findings/role-split.md), [framework](../docs/findings/framework.md),
+  [capability-vllm](../docs/findings/capability-vllm.md), vllm-layout E).
+- **vLLM over llama.cpp** for concurrency: the agent's floor through 12 sessions against 4, and
+  vision 16 requests against 1 on gb10-2 ([agent-vllm](../docs/findings/agent-vllm.md),
+  capability-vllm).
+- **The agent's FP8 KV row**: no significant loss against BF16 at 95% on GPQA diamond or RULER,
+  though 198 questions can't exclude a few points (vllm-layout, C).
+- **NVFP4 vision**: no significant loss against Google's BF16 on mmmu_val (vllm-layout, G).
+- **Audio beside embedding on the Framework**: it holds beside embedding at a steady 34 requests
+  a second and not beside embedding run flat out, nor beside vision on gb10-2 (vllm-layout, E, F).
+
+What the layout needs from spike-model-gateway (admission on live latency and queue signals,
+queueing past each row's cap, embedding held to 34 requests a second, overflow to cloud models,
+model management only through the gateway, no failover, the Framework's console after a reboot)
+and from the intake's host descriptors is in [`docs/layout.md`](../docs/layout.md), with on-demand
+loading and two-node serving recorded as not pursued.
+
+Open: FP8's uncalibrated KV scale, which the test can't clear to a point or two; audio's zero
+headroom above its target; the Framework's reboot, which needs a person at its console to unlock
+its disk; vLLM v0.34.0, unreleased; the pull request to spike-model-engines' `host/`, unmerged
+until the walkthrough (vllm-layout, N).
 
 ## The evidence
 
@@ -102,7 +143,14 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
   the bottleneck (the architect, 2026-11-12).
 - **Two-node serving** over QSFP with vLLM and Ray: not pursued, since one model per vLLM instance
   across the GB10s replaces pooling them (the architect, 2026-11-12).
-- **The layout document:** [`docs/layout.md`](../docs/layout.md), living, finalized by the answer.
+- **The tuned vLLM layout** measured as it stands: the agent's FP8 KV row settled by the accuracy
+  check, gb10-2's and the Framework's cells that placed vision, audio and embedding, the NVFP4
+  vision check, llama.cpp's removal, each host's reboot, and the standing cell at the load targets,
+  [`docs/findings/vllm-layout.md`](../docs/findings/vllm-layout.md).
+- **The accuracy check:** lm-evaluation-harness 0.4.13 in the bench environment, run against a
+  host's OpenAI API, its paired per-question test read by `bench/paired.awk`.
+- **The layout document:** [`docs/layout.md`](../docs/layout.md), finalized: the layout per host,
+  the requirements for spike-model-gateway and for the intake, and what was not pursued.
 - **The step helpers:** `scripts/measure-lib.sh`, adapted from spike-hosting-upgrades' without its
   tier and conform helpers, sourced and called one step at a time, logging every command to this
   spike's `.state/measure/<host>/`. The read-only `footprint` helper prints each llama-server
@@ -116,7 +164,8 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
 - **The result readers:** `bench/levels.jq` turns GuideLLM's result JSON into per-level tables
   judged against each purpose's floor, `bench/srvtimes.awk` with `bench/stats.awk` reads each
   request's server timings from the router log, and `bench/capacity.jq` with `bench/readouts.awk`
-  reads the vLLM capacity cell, [`bench/README.md`](../bench/README.md).
+  reads the vLLM capacity cell, and `bench/paired.awk` pairs two accuracy runs per question,
+  [`bench/README.md`](../bench/README.md).
 
 ## Path
 
@@ -142,10 +191,11 @@ and load targets are agreed in its task's own plan round.
    Framework (vLLM ROCm), against llama.cpp's sections rerun in the same session; a pull request
    to spike-model-engines' `host/` first gives each row its own container, port and memory fraction
    (evidence 3, 5, beside 6).
-7. `vllm-layout`: vLLM instances, one model each, across gb10-1 and gb10-2, with the Framework as
-   backup compute, tuned and measured at the load targets, with the FP8-against-BF16 accuracy
-   check as the task's one new tool; the hosts end on that layout, with llama.cpp removed from the
-   workstations. Then the answer: `docs/layout.md` finalized, the routing and model-management
+7. `vllm-layout`: vLLM instances, one model each, tuned and measured at the load targets, with
+   the FP8-against-BF16 accuracy check as the task's one new tool. The measurements moved the
+   placement: audio missed beside vision on gb10-2 and held beside rate-limited embedding on the
+   Framework, so the hosts end on gb10-1 the agent, gb10-2 vision, and the Framework audio and
+   embedding, with no failover and llama.cpp removed from the workstations. Then the answer: `docs/layout.md` finalized, the routing and model-management
    requirements for spike-model-gateway, README "The answer", and the answer section in
    `ai-hosting.md` (evidence 7, 9). It may take up to five slices, the last a walkthrough: the
    one exception to the rules' four.
