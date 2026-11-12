@@ -546,30 +546,157 @@ slices 5/5 committed (5 waived) · standards — · spec — · editor —
 - vllm-layout (BUILD): the standing-layout cell, all three hosts at once for 240 s, met every floor: agent 4 ITL 48.13 ms; vision 4 4.49 s (212/212); audio 4 RTFx 5.78; embedding at 34 req/s 17,442 tok/s. Embedding ran at the gateway's rate, not closed-loop, as the layout's standing condition; the agent cell reused role-split-mixed-agent.yaml at 4.
 
 - vllm-layout (BUILD): slice 5's walkthrough waived by the architect, who knows the layout's details from the session and is satisfied with the outcome (as the hosts task's walkthrough was waived); its replacement step (audio 4 beside embedding at 34 req/s, for the dropped failover) was agreed, then waived with the rest.
+- vllm-layout (BUILD, standards review): `bench/paired.awk` prints and counts an id seen twice in one run, pairs only its first line, and exits 1, where it paired it twice; it sums McNemar's binomial in logs, since 0.5^m underflows to 0 past m = 1074 and read every such split as significant. The task's four paired tests read the same figures. `bench/levels.jq` names a level once, by `level_name` (its streams or "rate <r>"), which `client` now uses too.
+- vllm-layout (BUILD): host/ 90ef16f, the pull request's head, changes comments only on top of 8f981ee (the section comment's vision floor "at every pair but 8 + 8", the audio comment rewrapped); the hosts stay on 8f981ee, where every figure was measured, as capability-vllm's bb68cbd did.
+- vllm-layout (BUILD): currency reports uv 0.13.7 behind 0.13.8 in the bench environment; the move is left to the next currency step; an intake note.
+- vllm-layout (BUILD): `bench/levels.jq`'s `client` mode stops with a jq error on an embedding result (`vllm-layout-fw-embed-sweep.json`: a null first-chunk time, since embedding requests don't stream); left as found, an intake note.
 
 ## Pending edits
 
-- coordinator · ai-hosting.md "Hosts and access": the drop-caches rule on both GB10s.
-- coordinator · ai-hosting.md "gb10-2 serves set A": spike-ai-pipeline's llama.env and host-update are stale; gb10-2 serves from spike-model-engines' engines suite and shared preset, whose 26B-A4B QAT section carries `ub = 1120` and `image-min-tokens = 560` on every host, so "The Framework's set A likely has the same 512 cap" no longer holds.
+- coordinator · ai-hosting.md "Answers · experiment.hosting": add the section below after "Answer · experiment.hosting.spike-hosting-upgrades".
+
+  ```markdown
+  ### Answer · experiment.hosting.spike-model-layout
+
+  **Question:** How are models placed across the three workstations' memory pools to make the best
+  use of memory, and what context and how many concurrent sessions does each placed model hold?
+
+  **Answer:** Each model runs in its own vLLM v0.33.0 instance, one heavy purpose to a GPU: gb10-1
+  serves the agent, gb10-2 vision, and the Framework audio beside embedding rate-limited by the
+  gateway. Compute shared on one GPU, not memory, decides the placement.
+
+  The architect chose the layout, and the spike gives its evidence. Every figure is a LAN figure,
+  since production clients sit on the same direct network as the GPUs, and no figure is compared
+  across sessions.
+
+  | Host | Purpose and model | vLLM row, fraction | Sequences × context | Load target | Standing cell, all three hosts at once | Holds alone |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | gb10-1 | agent: gpt-oss-120b, FP8 KV | `gpt-oss-120b-agent-fp8`, 0.80 | 12 × 131,072 | 4 sessions | ITL 48.13 ms | 12 sessions (ITL 99.07 ms) |
+  | gb10-2 | vision: Gemma 4 26B-A4B, NVIDIA's NVFP4 | `gemma-4-26B-A4B-NVFP4-vision-gb10`, 0.40 | 16 × 8,192 | 4 requests | 4.49 s | 16 requests (9.64 s) |
+  | framework | audio: Gemma 4 E4B, BF16 | `gemma-4-E4B-it-audio-framework`, 0.18 | 4 × 8,192 | 4 requests | RTFx 5.78 | 4, beside embedding at 34 req/s (RTFx 5.84) |
+  | framework | embedding: granite-embedding-english-r2 | `granite-embedding-english-r2-framework`, 0.03 | 128 × 8,192 | 16 streams, at most 34 req/s | 17,442 prompt tok/s | knee at 16 streams, 98,325 prompt tok/s |
+
+  The floors: agent ITL median ≤100 ms, vision request latency median ≤10 s, audio RTFx median ≥5,
+  embedding ≥4,300 prompt tok/s.
+
+  1. Purposes kept apart, not memory, decide the layout. Every miss the spike measured was
+     purposes sharing one GPU's compute and bandwidth, with memory far above the floors. Set A on
+     one GB10 took the agent to ITL 237.67 ms with 15.86 GiB free at its lowest. The capability
+     host on llama.cpp missed vision (38.90 s) and audio (RTFx 0.98) with 68.69 GiB free, and two
+     capability hosts held 0 of 4 vision and 0 of 4 audio streams at the targets. On vLLM, audio
+     beside vision on gb10-2 missed at every pair level from 2 + 2 to 8 + 8 streams (RTFx 2.86 to
+     3.36), with 35.53 GiB free in the pair cell, while each held alone. Proven by measured runs:
+     [role-split](https://github.com/JaimeStill/spike-model-layout/blob/main/docs/findings/role-split.md)
+     (llama.cpp b12098, 2026-11-10),
+     [framework](https://github.com/JaimeStill/spike-model-layout/blob/main/docs/findings/framework.md)
+     (b12098, 2026-11-10),
+     [capability-vllm](https://github.com/JaimeStill/spike-model-layout/blob/main/docs/findings/capability-vllm.md)
+     (vLLM v0.33.0, 2026-11-11) and
+     [vllm-layout](https://github.com/JaimeStill/spike-model-layout/blob/main/docs/findings/vllm-layout.md),
+     E and K (v0.33.0, 2026-11-12).
+  2. vLLM over llama.cpp, for concurrency. On gb10-1 the FP8 KV row met the agent's floor through
+     12 sessions, the BF16 row through 8, and llama.cpp through 4. Each capability purpose alone
+     held 16 vision and 16 audio requests on gb10-2 against llama.cpp's 1 and 1, with 4.4 times
+     llama.cpp's embedding throughput at 16 streams (c). Proven by measured runs:
+     [agent-vllm](https://github.com/JaimeStill/spike-model-layout/blob/main/docs/findings/agent-vllm.md),
+     F, and capability-vllm (v0.33.0 against b12098, 2026-11-11).
+  3. The agent's FP8 KV row. lm-evaluation-harness 0.4.13 found no significant loss against BF16
+     at 95%: GPQA diamond 0.6212 against 0.6667 (b 24, c 15, p 0.20); RULER's needle at 32,768
+     tokens 0.80 against 0.88 (p 0.22) and at 65,536 0.92 against 0.90 (p 1). FP8 holds 1,733,910
+     tokens of KV in the same bytes. Proven by measured runs: vllm-layout, C (2026-11-12).
+  4. NVFP4 vision. mmmu_val scored 0.6111 on NVIDIA's NVFP4 on gb10-2 against 0.6178 on Google's
+     BF16 on the Framework (b 78, c 72, p 0.68), no significant loss; CUDA against ROCm is a limit.
+     Proven by measured runs: vllm-layout, G (2026-11-12).
+  5. Audio beside embedding on the Framework. Audio alone reached RTFx 6.54. Beside embedding run
+     flat out at 16 streams it fell to 2.44; beside embedding at a steady 8.4 and 34 requests a
+     second it held 6.43 and 5.84; at 8 streams beside 34 requests a second it missed at 4.94, so
+     its cap is 4. Embedding's knee is 16 streams at 98,325 prompt tok/s, about 23 times its floor
+     (c). Proven by measured runs: vllm-layout, F (2026-11-12).
+  6. The standing layout at the load targets. All three hosts at once for 240 s met every floor:
+     the agent at 4 sessions (ITL 48.13 ms), vision at 4 (4.49 s, 212 of 212 ≤10 s), audio at 4
+     (RTFx 5.78), and embedding at 34 requests a second (17,442 prompt tok/s). At their lowest
+     gb10-1 read 14.87 GiB and gb10-2 65.21 GiB (floor 12.2), and the Framework 90.24 GiB of GTT
+     (11.2) and 87.27 GiB of system memory (12.5). After one reboot each, gb10-2 served vision in
+     3 min 49 s and gb10-1 the agent in 8 min 58 s, unattended; the Framework served after the
+     architect entered its LUKS passphrase. llama.cpp is removed from all three hosts. Proven by
+     measured runs: vllm-layout, H, I and J (2026-11-12).
+  7. Host parity and the capacity table. gb10-1 and gb10-2 run anchors A and B within run noise of
+     each other (A −1.37%, B −0.99% output tok/s), so cells compare across the GB10s. Each set A
+     model's memory on a GB10 and on the Framework gives the capacity table the placements are
+     sized from. Proven by measured runs:
+     [hosts](https://github.com/JaimeStill/spike-model-layout/blob/main/docs/findings/hosts.md)
+     and
+     [footprint](https://github.com/JaimeStill/spike-model-layout/blob/main/docs/findings/footprint.md),
+     I (b12098, 2026-11-09).
+
+  Not pursued:
+
+  - On-demand loading. GPU compute, not memory, is the bottleneck, and loading and unloading add
+    compute on top of inference (architect, 2026-11-12).
+  - Two-node serving over QSFP with vLLM and Ray. One model per vLLM instance across the GB10s
+    replaces pooling them; the agent holds 12 sessions of 131,072 tokens on gb10-1 alone
+    (architect, 2026-11-12).
+  - Redundancy and failover. Each purpose has one host, by the architect's choice. The Framework's
+    staged vision row (Gemma 4 12B QAT w4a16, never measured) and audio failover row were dropped
+    when audio moved to the Framework (architect, 2026-11-12).
+  - CUDA MPS and other concurrency tools. Placement and vLLM's per-row limits keep the purposes
+    apart.
+
+  Gaps in the answer:
+
+  - The agent's FP8 KV runs uncalibrated at scale 1.0. GPQA's 198 questions put the paired
+    difference's 95% interval at −10.7 to +1.6 points (c), so a loss of a few points isn't
+    excluded.
+  - Audio has no headroom above its target of 4. A fifth stream queues or overflows; 8 streams
+    beside embedding at 8.4 requests a second is untested.
+  - The Framework returns from a reboot only after a person enters its LUKS passphrase at its
+    console, and can't be rebooted remotely.
+  - The FP8 row's compiling start dipped under gb10-1's floor (11.39 GiB for 21 s); a start with the
+    compile cache warm stayed above it.
+  - vLLM v0.34.0 was unreleased, so every host stays on v0.33.0, unmeasured on v0.34.
+  - Vision's load from streamed video is unmeasured: every vision cell sent image questions.
+  - Sessions of 131,072 tokens are computed from the KV cache, not run; the deepest measured were 8
+    concurrent 65,603-token requests, held on both agent rows.
+
+  Requirements for the intake to route:
+
+  - spike-model-gateway: admission on the engines' live latency and queue signals per purpose
+    floor, queueing past each row's cap, embedding held to at most 34 requests a second, overflow
+    to cloud models, model management only through the gateway, no failover, and the Framework
+    treated as down after a reboot until its console unlock
+    ([docs/layout.md, "Requirements for spike-model-gateway"](https://github.com/JaimeStill/spike-model-layout/blob/main/docs/layout.md#requirements-for-spike-model-gateway)).
+  - spike-hosting-upgrades' host descriptors: each host's purposes and load targets from the
+    layout, and a new descriptor for gb10-2
+    ([docs/layout.md, "Requirements for the intake: the host descriptors"](https://github.com/JaimeStill/spike-model-layout/blob/main/docs/layout.md#requirements-for-the-intake-the-host-descriptors)).
+
+  [The answer](https://github.com/JaimeStill/spike-model-layout/blob/main/README.md#the-answer) ·
+  [spike-model-layout](https://github.com/JaimeStill/spike-model-layout)
+  ```
+
+- coordinator · ai-hosting.md "spike-model-layout" (under "Experiment: experiment.hosting"): replace "across gb10-1 and gb10-2, with the Framework as backup compute" with the layout as measured (gb10-1 the agent, gb10-2 vision, the Framework audio and embedding, the embedding rate-limited by the gateway), and end the section with "The spike has answered: "Answer · experiment.hosting.spike-model-layout", under "Answers · experiment.hosting" below.", as spike-hosting-upgrades' section does.
+- coordinator · ai-hosting.md "vLLM is the preferred engine on the workstations": the first bullet's "with the Framework as backup compute" no longer holds; the Framework serves audio and embedding, and no purpose has a second host (spike-model-layout `docs/layout.md`, "The layout").
+- coordinator · ai-hosting.md "The llama container binds before Tailscale is up": no workstation runs the llama container, and all three hosts set `net.ipv4.ip_nonlocal_bind = 1` persistently (gb10-1 and gb10-2 `/etc/sysctl.d/90-nonlocal-bind.conf`, the Framework `60-tailnet-bind.conf`), so every vLLM row bound to the tailnet came back by itself after a reboot (spike-model-layout `docs/findings/vllm-layout.md`, I.1, I.3).
+- coordinator · ai-hosting.md "Hosts and access": the drop-caches rule is on all three hosts (`/usr/sbin/sysctl` on the GB10s, `/usr/bin/sysctl` on the Framework).
+- coordinator · ai-hosting.md "gb10-2 serves set A": the section no longer holds. gb10-2 serves vision alone on vLLM v0.33.0 (`gemma-4-26B-A4B-NVFP4-vision-gb10`) from spike-model-engines' engines suite, and no workstation runs llama.cpp (spike-model-layout `docs/layout.md`); spike-ai-pipeline's llama.env and host-update are stale. spike-model-engines' shared preset keeps the 26B-A4B QAT section's `ub = 1120` and `image-min-tokens = 560` for every host.
+- coordinator · roadmap.toml, spike-model-gateway's entry (the comment "For this spike's plan round"): the layout's requirements for the gateway are in spike-model-layout `docs/layout.md`, "Requirements for spike-model-gateway"; every workstation runs vLLM, so the summary's condition for vLLM's production-stack router holds, as the comment expected.
 - coordinator · intake note (ai-hosting.md, experiment.hosting): gb10-1's descriptor there still says gb10-2 is reserved for spike-ai-pipeline.
-- coordinator · intake note (ai-hosting.md, experiment.hosting): spike-model-engines' llama.cpp setup guide ("GB10, in a container") says gb10-2 is reserved and puts the clone in the home directory, not ~/repos (outside host/).
-- coordinator · intake note (ai-hosting.md, experiment.hosting): spike-ai-pipeline's laptop-side `mise run host-update` fails at its clone pull once the clone is gone; it touches nothing first.
-- coordinator · intake note (ai-hosting.md, experiment.hosting): the Framework held the same store extras as gb10-1 (Gemma 4 12B, 31B and E4B QAT GGUFs; granite's safetensors); the framework task cleared them with `hf cache rm` (32.45 GB), so both stores hold set A's four models only (spike-model-layout `docs/findings/framework.md`, section A).
-- coordinator · intake note (ai-hosting.md, experiment.hosting): gb10-2 has no host descriptor in spike-hosting-upgrades, and this task's within-session spread on gb10-2 (output tok/s: A 2.37%, B 0.52%) is its first run-noise figure; spike-hosting-upgrades' descriptor work can take both.
-- spike-model-engines · intake note: docs outside host/ still name strix-halo's pin as b11960 (context/README.md "Held pins", docs/engines/llama.cpp/README.md:14, update.md:35, setup.md:303 and :591); this spike changes only host/.
-- coordinator · intake note (ai-hosting.md, experiment.hosting, "Gaps in the answer": the vision section's prompt-cache keys still to verify): the shared preset's 26B-A4B QAT and E4B sections set no `cache-ram`, so each process's host prompt cache defaults to 8192 MiB; under vision load it took gb10-1 under its floor, and on the Framework it sits in system memory, outside the GTT floor (spike-model-layout `docs/findings/footprint.md`, sections G and K). Capping it is role-split's pull request to spike-model-engines' `host/`.
-- coordinator · intake note (roadmap.toml, the comment "Inputs to sizing set A's slots"): the vision line's ~477 tokens a page is the model's default image-max-tokens on ggml-org's weights; on the QAT section, `image-min-tokens = 560` and `ub = 1120` put an image at 560 to 1,120 tokens. The audio line's 32,768-token context is the E4B section's total; each of its 4 slots holds 8,192 tokens, under the 10-minute WAV's 15,028 (spike-model-layout `docs/findings/footprint.md`, section I.6; sizing that request is role-split's).
-- spike-model-engines · intake note: `docs/engines/llama.cpp/models.md` (outside host/) does not list role-split's three new sections or the Gemma cap keys; measure-lib's `gate` on a Framework clone carrying them would load the 16-slot 26B-A4B section, which aborts on Vulkan past 4 slots.
-- spike-model-engines · intake note: granite's section sets no cache keys, so every embedding request saves its idle slot to the prompt cache (177,657 saves in one 2.5-min sweep on gb10-2); `cache-idle-slots = false` and `cache-ram = 0` would stop it (spike-model-layout `docs/findings/role-split.md`).
+- coordinator · intake note (ai-hosting.md, experiment.hosting, the host descriptors): the descriptors' purposes and load targets follow the layout (spike-model-layout `docs/layout.md`, "Requirements for the intake: the host descriptors"). gb10-1 serves the agent alone on `gpt-oss-120b-agent-fp8` (4 sessions, 12 at most), 15.07 GiB idle and 14.87 GiB at its lowest against its 12.2 GiB floor, its compiling start dipping to 11.39 GiB. gb10-2 has no descriptor in spike-hosting-upgrades and needs one: vision alone (4 requests, 16 at most), with the hosts task's within-session spread on gb10-2 (output tok/s: A 2.37%, B 0.52%) as its first run-noise figure. The Framework serves audio (4 requests, 4 at most) and embedding (16 streams, admitted at up to 34 requests a second).
+- coordinator · intake note (ai-hosting.md, experiment.hosting, Framework OS and configuration): the GTT ceiling was already 112 GiB (ttm.pages_limit 29,360,128, set by spike-model-engines' setup); vllm-layout removed the deprecated amdgpu gttsize option, which the kernel warned about, keeping ttm.pages_limit alone; the BIOS VRAM carve-out is 512 MiB; past ~112.6 GiB of GPU use the system's 12.5 GiB floor binds before GTT's; the Framework stays on Omarchy with Hyprland by the architect's choice, after weighing headless Ubuntu Server.
+- coordinator · intake note (ai-hosting.md, experiment.hosting, Framework OS and configuration): the Framework's root is LUKS-encrypted, so it returns from a reboot only after a person enters the passphrase at its console, and can't be rebooted remotely or unattended as the GB10s can. How it unlocks is the architect's security decision, on either OS: TPM2 enrollment or a keyfile (no person), or SSH in the initramfs (remote) (spike-model-layout `docs/findings/vllm-layout.md`, I.4, N.3).
+- coordinator · intake note (ai-hosting.md, experiment.hosting, Framework OS and configuration): the Framework's df didn't drop when llama.cpp's GGUFs were removed (81.87 GiB of store): its btrfs snapshots likely hold the blocks until they rotate out, and reading them needs root. The architect left the snapshots as they are (spike-model-layout `docs/findings/vllm-layout.md`, H, N.5).
+- coordinator · intake note (ai-hosting.md, experiment.hosting): the hosts' stores hold only the models their rows serve: gb10-1 `openai/gpt-oss-120b`, gb10-2 `nvidia/Gemma-4-26B-A4B-NVFP4`, the Framework `google/gemma-4-E4B-it` and `ibm-granite/granite-embedding-english-r2`. Earlier tasks cleared the GB10's and the Framework's extras with `hf cache rm`, and vllm-layout removed set A's GGUFs and the BF16 26B-A4B (spike-model-layout `docs/findings/framework.md`, A; `docs/findings/vllm-layout.md`, G.4, H).
+- coordinator · intake note (ai-hosting.md, experiment.hosting): vLLM v0.34.0 was not released when vllm-layout's BUILD started (GitHub's latest v0.33.0; tags v0.34.0rc0 to rc2 only), so every host stays on v0.33.0. v0.34 carries the GB10 weight-loading fix (#58868), which bears on gb10-1's 437 s and gb10-2's 128 s weight reads after a reboot, and the extensible KV cache (spike-model-layout `docs/findings/vllm-layout.md`, A.2, N.6).
+- coordinator · intake note (ai-hosting.md, experiment.hosting): the agent's FP8 KV runs uncalibrated at scale 1.0. The accuracy check found no significant loss against BF16, but GPQA diamond's 198 questions put the paired difference's 95% interval at −10.7 to +1.6 points, so a loss of a few points isn't excluded; calibration or a larger set would narrow it (spike-model-layout `docs/findings/vllm-layout.md`, C.5, N.1).
+- coordinator · intake note (ai-hosting.md, experiment.hosting): vision's load from streamed video is unmeasured; every vision cell sent image questions (the architect raised it).
+- coordinator · intake note (ai-hosting.md, experiment.hosting, "Gaps in the answer": the vision section's prompt-cache keys still to verify): the shared preset caps the 26B-A4B QAT and E4B sections' host prompt cache (`cache-ram 0`, `cache-idle-slots false`, `ctx-checkpoints 2`, role-split's pull request, 21b5e8c); uncapped, it took gb10-1 under its floor under vision load (spike-model-layout `docs/findings/footprint.md`, G and K). No workstation runs llama.cpp now, so the verify item has no host to run on.
 - coordinator · intake note (ai-hosting.md, experiment.hosting, the rules' "Benchmarks"): production clients sit on the same direct network as the GPUs, so the layout is sized on LAN figures (the architect). A cell run from the laptop over a Tailscale relay carries the relay's trip in its client-side figures (TTFT, request latency, RTFx), about 0.4 s for a 6 s audio clip, and its server-side figures are unaffected (spike-model-layout `docs/findings/role-split.md`, "Stack, engine and network path" and L.7). The `tailscale ping` each run records shows which path it took.
-- spike-model-engines · intake note: host/llama.env's hold comment says "checked still unrestored through b12211"; the framework task found it unchanged through b12242. The next pull request to host/ (agent-vllm's vLLM pin) can carry the new build number.
-- spike-model-engines · intake note: the preset's `gemma-4-26B-A4B-it-qat-Q4_0-16-slots` comment (host/llama-preset/models.ini:217, "GB10 only: on Vulkan (the Framework) the section aborts past 4 slots") is broader than measured: aborts were at 16 x 131,072 (#29082) and 15 x 131,072 (#29221); 4 x 8,192 runs; 5-14 slots and 16 x 8,192 never ran on Vulkan; #29221's report crashes at -np 4 with 262,144-token slots; the E4B past 4 slots never ran on Vulkan either. The framework task left both untested, since the fix (#25584) is in no build and more slots add no vision throughput (spike-model-layout `docs/findings/framework.md`, K.4).
-- coordinator · intake note (ai-hosting.md, experiment.hosting, "Gaps in the answer"): on the Framework, vision and audio each met their floor alone at 1 stream (6.82 s; RTFx 8.81) and missed beside each other and embedding (11.94 s; RTFx 4.03) with 82.27 GiB of GTT and at least 84.41 GiB of system memory free; on gb10-2 they missed together at 1 stream with 69 GiB free. The finding reads the purposes' sharing of one GPU's compute and bandwidth, not memory capacity, as what holds them under their floors; no cell isolated it. Two capability hosts held 0 of 4 vision and 0 of 4 audio streams at the load target, and at most 2 vision requests with nothing else running (spike-model-layout `docs/findings/framework.md`, F, J, L.1).
-- coordinator · intake note (ai-hosting.md, experiment.hosting, the host descriptors' load targets): gb10-1's agent-only section (c 1,179,648 over 16 slots) met the agent's 4-session target in every cell but ran 0.30 to 0.36 GiB above its 12.2 GiB floor at its lowest, after role-split's 0.27 GiB (spike-model-layout `docs/findings/framework.md`, H, L.5).
-- spike-model-engines · intake note: `scripts/currency.sh` compares `VLLM_RELEASE` with GitHub's latest release, which is still named v0.33.0rc3, though the v0.33.0 tag and Docker images are the same commit; currency reports the pin against rc3 until GitHub publishes a v0.33.0 release. The fix is outside host/.
-- spike-model-engines · intake note (housekeeping): agent-vllm's pull request to host/ carries llama.env's hold note through b12271, which supersedes the b12211 -> b12242 note above; drop that note once the pull request merges.
 - coordinator · intake note (ai-hosting.md, experiment.hosting): for the agent, the architect accepts a longer cold start in exchange for better concurrency and overall performance, and finds vLLM the more attractive agent engine, chiefly for its concurrency (spike-model-layout `docs/findings/agent-vllm.md`, the conclusion and N).
-- spike-model-engines · intake note: `docs/engines/vllm/models.md` and `docs/engines/vllm/api.md` (outside host/) still describe v0.32.0 and list neither the `gpt-oss-120b-agent` nor the `gpt-oss-120b-agent-fp8` row (spike-model-layout `docs/findings/agent-vllm.md`, N).
-- coordinator · intake note (ai-hosting.md, experiment.hosting): gpt-oss-120b's FP8 KV cache on vLLM runs uncalibrated at scale 1.0, and an accuracy check of the FP8 row against the BF16 row would settle the agent row. That check is vllm-layout's one new tool (spike-model-layout `docs/findings/agent-vllm.md`, E, N).
-- spike-model-engines · intake note: the vLLM guides in `docs/engines/vllm/` (README.md, setup.md, models.md, api.md, update.md, uninstall.md; outside host/) still describe one `vllm` container on port 8000. They don't cover a row's own container, port and image (capability-vllm's host/ change, 4ad76e6), `VLLM_ROCM_BUILD` and the `-rocm72` fallback, building the Framework's audio image, or the Framework's ufw route rules for ports 8001 and 8002, and they list none of the six capability rows (spike-model-layout `docs/findings/capability-vllm.md`, A.2, A.3, N).
-- coordinator · intake note (ai-hosting.md, experiment.hosting, Framework OS and configuration): the GTT ceiling was already 112 GiB (ttm.pages_limit 29,360,128, set by spike-model-engines' setup); vllm-layout removed the deprecated amdgpu gttsize option, which the kernel warned about, keeping ttm.pages_limit alone; the BIOS VRAM carve-out is 512 MiB; past ~112.6 GiB of GPU use the system's 12.5 GiB floor binds before GTT's; Hyprland stays by the architect's choice.
+- coordinator · intake note (ai-hosting.md, experiment.hosting): spike-model-layout's bench environment (`mise.bench.toml`) pins uv 0.13.7, behind 0.13.8, left to the next currency step; its `bench/levels.jq` `client` mode stops with a jq error on an embedding result, whose requests carry no first-chunk time.
+- coordinator · intake note (ai-hosting.md, experiment.hosting): spike-ai-pipeline's laptop-side `mise run host-update` fails at its clone pull once the clone is gone; it touches nothing first.
+- spike-model-engines · intake note: the vLLM guides in `docs/engines/vllm/` (README.md, setup.md, models.md, api.md, update.md, uninstall.md; outside host/) still describe v0.32.0 and one `vllm` container on port 8000. They don't cover a row's own container, port and image (capability-vllm's host/ change, 4ad76e6), `VLLM_ROCM_BUILD` and the `-rocm72` fallback, building the Framework's audio image, or the Framework's ufw route rules for ports 8001 and 8002, and they list none of the standing rows or their caps: `gpt-oss-120b-agent-fp8` (12) and `gpt-oss-120b-agent` (8) on gb10-1, `gemma-4-26B-A4B-NVFP4-vision-gb10` (16), `gemma-4-E4B-it-audio-framework` (4) and `granite-embedding-english-r2-framework` (128, 65,536 batched tokens). vllm-layout removed gb10-2's audio and embedding rows and the Framework's vision rows (spike-model-layout `docs/findings/agent-vllm.md`, N; `docs/findings/capability-vllm.md`, A.2, A.3, N; `docs/findings/vllm-layout.md`, B).
+- spike-model-engines · intake note: the llama.cpp guides in `docs/engines/llama.cpp/` (outside host/) describe llama.cpp serving the workstations, and no workstation runs it: vllm-layout removed its container, images and GGUFs from all three hosts, and spike-model-engines keeps every llama.cpp feature. They also name strix-halo's pin as b11960 (README.md:14, update.md:35, setup.md:303 and :591, and context/README.md "Held pins"); the GB10 setup guide ("GB10, in a container") says gb10-2 is reserved and puts the clone in the home directory, not ~/repos; and `models.md` lists neither role-split's three sections nor the Gemma cap keys (spike-model-layout `docs/findings/vllm-layout.md`, H).
+- spike-model-engines · intake note: on a Vulkan host, measure-lib's `gate` on a clone carrying role-split's sections would load the 16-slot 26B-A4B section, which aborts on Vulkan past 4 slots.
+- spike-model-engines · intake note: granite's llama.cpp section sets no cache keys, so every embedding request saves its idle slot to the prompt cache (177,657 saves in one 2.5-min sweep on gb10-2); `cache-idle-slots = false` and `cache-ram = 0` would stop it (spike-model-layout `docs/findings/role-split.md`).
+- spike-model-engines · intake note: the preset's `gemma-4-26B-A4B-it-qat-Q4_0-16-slots` comment (host/llama-preset/models.ini:217, "GB10 only: on Vulkan (the Framework) the section aborts past 4 slots") is broader than measured: aborts were at 16 x 131,072 (#29082) and 15 x 131,072 (#29221); 4 x 8,192 runs; 5-14 slots and 16 x 8,192 never ran on Vulkan; #29221's report crashes at -np 4 with 262,144-token slots; the E4B past 4 slots never ran on Vulkan either. The framework task left both untested, since the fix (#25584) is in no build and more slots add no vision throughput (spike-model-layout `docs/findings/framework.md`, K.4).
+- spike-model-engines · intake note (host/, the audio image): the Framework's audio image lacks torchcodec, so every audio request logs `torchcodec unavailable ... falling back to soundfile/PyAV`; the image keeps that fallback (spike-model-layout `docs/findings/vllm-layout.md`, L).
+- spike-model-engines · intake note (host/, `vllm_remove_images`): `engines vllm update` removes every official image no container was created from, so the Framework's update for granite removed the staged `vllm/vllm-openai-rocm:v0.33.0-rocm72` fallback's tag; its layers stay under the `-rocm72` audio image, and `docker pull` restores it (spike-model-layout `docs/findings/vllm-layout.md`, B).

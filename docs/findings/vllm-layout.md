@@ -84,7 +84,7 @@ to 7 ms ("Stack, engine and network path"), so client-side and server-side figur
 
 | Host | Serves at the end of slice 3 |
 | --- | --- |
-| gb10-1 | `vllm` (`vllm/vllm-openai:v0.33.0`) on the row `gpt-oss-120b-agent-fp8`, port 8000, `unless-stopped`, started by the reboot at 21:18:26Z, RestartCount 0; nothing else in `docker ps -a`. llama.cpp's container, its `server-cuda13-b12098` image and the GGUF repositories removed; the store holds `openai/gpt-oss-120b` alone. spike-model-engines' clone on a local `hosts` branch at 8f981ee, the pull request's head, before merge |
+| gb10-1 | `vllm` (`vllm/vllm-openai:v0.33.0`) on the row `gpt-oss-120b-agent-fp8`, port 8000, `unless-stopped`, started by the reboot at 21:18:26Z, RestartCount 0; nothing else in `docker ps -a`. llama.cpp's container, its `server-cuda13-b12098` image and the GGUF repositories removed; the store holds `openai/gpt-oss-120b` alone. spike-model-engines' clone on a local `hosts` branch at 8f981ee, where every figure was measured, before merge (B) |
 | gb10-2 | `vllm-vision` on `gemma-4-26B-A4B-NVFP4-vision-gb10`, port 8000, `unless-stopped`, started 21:13:18Z, RestartCount 0; nothing else. llama.cpp removed; the store holds `nvidia/Gemma-4-26B-A4B-NVFP4` alone (18.8G). Clone on `hosts` at 8f981ee |
 | framework | `vllm-audio` (the audio image) on `gemma-4-E4B-it-audio-framework`, port 8001, and `vllm-embed` on `granite-embedding-english-r2-framework`, port 8002, both `unless-stopped`, started 21:16:24Z, RestartCount 0; nothing else. llama.cpp's container and its Vulkan and ROCm images removed; the store holds `google/gemma-4-E4B-it` and `ibm-granite/granite-embedding-english-r2`; the BF16 26B-A4B removed (G). Images kept: `vllm/vllm-openai-rocm:v0.33.0` and both audio images (`v0.33.0`, `v0.33.0-rocm72`). Clone on `hosts` at 8f981ee |
 
@@ -181,9 +181,10 @@ pull request's commit as it reached it (B).
 
 ## B. The host/ pull request (Behaviors 2, 7)
 
-Three commits on spike-model-engines' `vllm-layout` branch, each reaching a host before merge by
-`git push <host>:repos/spike-model-engines vllm-layout:hosts-next` and `git checkout -B hosts
-hosts-next` on the host, the way the earlier tasks did. `mise run check` passed in
+Four commits on spike-model-engines' `vllm-layout` branch. The first three each reached a host
+before merge by `git push <host>:repos/spike-model-engines vllm-layout:hosts-next` and `git
+checkout -B hosts hosts-next` on the host, the way the earlier tasks did. The fourth, 90ef16f,
+changes comments only, so every figure was measured at 8f981ee. `mise run check` passed in
 spike-model-engines at each commit. The pull request changes `host/vllm-rows` and `host/llama.env`
 only.
 
@@ -192,6 +193,7 @@ only.
 | 3efb444 | the agent rows' caps: `gpt-oss-120b-agent` `--max-num-seqs 8` and `gpt-oss-120b-agent-fp8` `--max-num-seqs 12`, from 16 each, everything else unchanged; llama.env's hold note reads "unrestored through b12318"; the vLLM pin stays v0.33.0 | agent-vllm F, "Meets the floor through" | gb10-1, 13:53:37Z |
 | f0d0d0a | gb10-2's embedding row `granite-embedding-english-r2-gb10` removed, its vision (0.40) and audio (0.20) at 16 sequences; the Framework's granite row at `--max-num-seqs 128 --max-num-batched-tokens 65536`, 0.03; a new row `gemma-4-12B-it-qat-w4a16-ct-vision-framework` (Google's 12B QAT w4a16, 9.56 GiB, 0.20, port 8000) as the vision failover, and the E4B audio row described as the audio failover; the BF16 26B-A4B row kept as the accuracy reference | capability-vllm H, I, N.1, K, N.2, G | gb10-2 16:10:42Z; the Framework 17:16:58Z |
 | 8f981ee | gb10-2's audio row removed, its vision row unchanged at 16; the Framework's audio row at `--max-num-seqs 4`, standing, no longer a failover; the Framework's 12B and BF16 26B-A4B rows removed; the section comment states the standing layout and granite's comment the gateway's 34 requests a second | this task's cells: vllm-layout-g2-vision-capacity, -fw-pair-a4r34, -fw-stress-a8r34 (E, F) | gb10-2 20:28:55Z; the Framework 20:32:47Z; gb10-1 20:38:22Z |
+| 90ef16f | comments only, every row's flags as at 8f981ee: the section comment says vision met its floor "at every pair but 8 + 8", and it and the audio row's comment are rewrapped at 100 columns | this task's E.3, E.6 | no host; the hosts run 8f981ee |
 
 Behavior 7 set gb10-2's caps from the pair cells; no pair held both purposes (E.3, E.4), so no
 pair cap was committed, and 8f981ee carries the caps the architect's later answers set instead:
@@ -771,10 +773,12 @@ None of these is decided here.
   128-second weight reads after a reboot (I.3).
 - **N.7 The 12B QAT w4a16** was chosen and never measured (G.3); a Framework vision row returns
   only with a layout that gives it a GPU.
-- **N.8 The walkthrough's failover step.** The brief's slice 5 starts the Framework's 12B row,
-  which 8f981ee removed; the walkthrough needs a step in its place.
-- **N.9 The pull request is unmerged**: all three clones serve from a local `hosts` branch at
-  8f981ee; Behavior 16's state, serving from the merged `main`, waits on the merge.
+- **N.8 The walkthrough was waived.** The brief's slice 5 started the Framework's 12B row, which
+  8f981ee removed. The architect agreed a replacement step (audio 4 beside embedding at 34
+  requests a second), then waived the walkthrough, that step with it (goal record).
+- **N.9 The pull request merges when the task ships**: until then all three clones serve from a
+  local `hosts` branch at 8f981ee, and Behavior 16's state, serving from the merged `main`, follows
+  the merge.
 - **Intake notes**, carried in the goal record's pending edits: v0.34 (A.2); torchcodec in the
   audio image (L); the Framework's LUKS unlock (I.4); its btrfs snapshots (H); its OS and GTT
   configuration (I.2: GTT already 112 GiB through `ttm.pages_limit`, the gttsize option removed, a

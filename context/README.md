@@ -21,44 +21,7 @@ and what context and how many concurrent sessions does each placed model hold?
 
 ## The answer
 
-The answer is evidence; the architect chose the layout. Each model runs in its own vLLM v0.33.0
-instance, one heavy purpose to a GPU, and the standing layout met every purpose's floor at the
-load targets with all three hosts at once
-([`docs/findings/vllm-layout.md`](../docs/findings/vllm-layout.md), J):
-
-| Host | Purpose and model | Sequences, context | Load target | Measured at the target, all hosts at once | Holds alone |
-| --- | --- | --- | --- | --- | --- |
-| gb10-1 | agent: gpt-oss-120b, FP8 KV | 12 × 131,072 | 4 sessions | ITL 48.13 ms | 12 sessions |
-| gb10-2 | vision: Gemma 4 26B-A4B NVFP4 | 16 × 8,192 | 4 requests | 4.49 s | 16 requests |
-| framework | audio: Gemma 4 E4B BF16 | 4 × 8,192 | 4 requests | RTFx 5.78 | 4, beside embedding |
-| framework | embedding: granite-embedding-english-r2 | 128 × 8,192 | at most 34 req/s | 17,442 prompt tok/s | knee at 16 streams, 98,325 tok/s |
-
-The evidence behind each placement:
-
-- **Purposes apart, not memory, decide the layout.** Every miss the spike measured was purposes
-  sharing one GPU's compute and bandwidth, with memory far above the floors: set A on one GB10, the
-  capability hosts on llama.cpp and on vLLM, and audio beside vision on gb10-2 at every pair level
-  ([role-split](../docs/findings/role-split.md), [framework](../docs/findings/framework.md),
-  [capability-vllm](../docs/findings/capability-vllm.md), vllm-layout E).
-- **vLLM over llama.cpp** for concurrency: the agent's floor through 12 sessions against 4, and
-  vision 16 requests against 1 on gb10-2 ([agent-vllm](../docs/findings/agent-vllm.md),
-  capability-vllm).
-- **The agent's FP8 KV row**: no significant loss against BF16 at 95% on GPQA diamond or RULER,
-  though 198 questions can't exclude a few points (vllm-layout, C).
-- **NVFP4 vision**: no significant loss against Google's BF16 on mmmu_val (vllm-layout, G).
-- **Audio beside embedding on the Framework**: it holds beside embedding at a steady 34 requests
-  a second and not beside embedding run flat out, nor beside vision on gb10-2 (vllm-layout, E, F).
-
-What the layout needs from spike-model-gateway (admission on live latency and queue signals,
-queueing past each row's cap, embedding held to 34 requests a second, overflow to cloud models,
-model management only through the gateway, no failover, the Framework's console after a reboot)
-and from the intake's host descriptors is in [`docs/layout.md`](../docs/layout.md), with on-demand
-loading and two-node serving recorded as not pursued.
-
-Open: FP8's uncalibrated KV scale, which the test can't clear to a point or two; audio's zero
-headroom above its target; the Framework's reboot, which needs a person at its console to unlock
-its disk; vLLM v0.34.0, unreleased; the pull request to spike-model-engines' `host/`, unmerged
-until the walkthrough (vllm-layout, N).
+The answer is in the top-level [`README.md`](../README.md#the-answer).
 
 ## The evidence
 
@@ -87,10 +50,11 @@ until the walkthrough (vllm-layout, N).
 7. The vLLM layout tuned: the agent row's KV dtype settled by an FP8-against-BF16 accuracy check;
    the capability pool's concurrency tuned across vision, audio and embedding together, with a
    strategy that keeps them from competing for compute; a lighter Gemma 4 vision model for the
-   Framework's vLLM ROCm engine; v0.34 against v0.33.0; and the standing layout at the load
-   targets.
+   Framework's vLLM ROCm engine (dropped when the Framework took audio and embedding, escalation
+   2); v0.34 against v0.33.0 (v0.34 unreleased, so the hosts stay on v0.33.0); and the standing
+   layout at the load targets.
 8. Not pursued: two-node serving over QSFP. One model per instance across the GB10s replaces
-   pooling them (the architect, 2026-11-12).
+   pooling them (the architect).
 9. The layout: per host, its purposes, models, context, slots and load targets; what it needs from
    routing (session stickiness, overflow) and model management as requirements for
    spike-model-gateway; the host descriptors' purposes and load targets as requirements for the
@@ -140,16 +104,16 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
   and embedding, each in its own process,
   [`docs/findings/capability-vllm.md`](../docs/findings/capability-vllm.md).
 - **On-demand serving** through llama.cpp's router: not pursued, since GPU compute, not memory, is
-  the bottleneck (the architect, 2026-11-12).
+  the bottleneck (the architect).
 - **Two-node serving** over QSFP with vLLM and Ray: not pursued, since one model per vLLM instance
-  across the GB10s replaces pooling them (the architect, 2026-11-12).
+  across the GB10s replaces pooling them (the architect).
 - **The tuned vLLM layout** measured as it stands: the agent's FP8 KV row settled by the accuracy
   check, gb10-2's and the Framework's cells that placed vision, audio and embedding, the NVFP4
   vision check, llama.cpp's removal, each host's reboot, and the standing cell at the load targets,
   [`docs/findings/vllm-layout.md`](../docs/findings/vllm-layout.md).
 - **The accuracy check:** lm-evaluation-harness 0.4.13 in the bench environment, run against a
   host's OpenAI API, its paired per-question test read by `bench/paired.awk`.
-- **The layout document:** [`docs/layout.md`](../docs/layout.md), finalized: the layout per host,
+- **The layout document:** [`docs/layout.md`](../docs/layout.md): the layout per host,
   the requirements for spike-model-gateway and for the intake, and what was not pursued.
 - **The step helpers:** `scripts/measure-lib.sh`, adapted from spike-hosting-upgrades' without its
   tier and conform helpers, sourced and called one step at a time, logging every command to this
@@ -163,7 +127,7 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
   without the system-memory floor (`MEASURE_SYSTEM_FLOOR_GIB`) and stops a cell under either floor.
 - **The result readers:** `bench/levels.jq` turns GuideLLM's result JSON into per-level tables
   judged against each purpose's floor, `bench/srvtimes.awk` with `bench/stats.awk` reads each
-  request's server timings from the router log, and `bench/capacity.jq` with `bench/readouts.awk`
+  request's server timings from the router log, `bench/capacity.jq` with `bench/readouts.awk`
   reads the vLLM capacity cell, and `bench/paired.awk` pairs two accuracy runs per question,
   [`bench/README.md`](../bench/README.md).
 

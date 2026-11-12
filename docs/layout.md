@@ -1,8 +1,8 @@
 # The layout
 
-The layout the architect chose for the three workstations, as it stands after the vllm-layout
-task: per host its purposes, models, rows, context, sequences, fractions and load targets, each
-figure citing its finding under `docs/findings/`. The spike decides nothing; the architect chose
+The layout the architect chose for the three workstations: per host its purposes, models, rows,
+context, sequences, fractions and load targets, each figure citing its finding under
+`docs/findings/`. The spike decides nothing; the architect chose
 each placement, and the findings are its evidence. Then what the layout needs from routing and
 model management (spike-model-gateway), what it needs from the host descriptors (the intake), and
 what was not pursued. The measured arrangements that led here follow, in "How the layout was
@@ -11,9 +11,10 @@ reached".
 ## The layout
 
 Each host serves vLLM v0.33.0 in containers, one model an instance, from spike-model-engines'
-`host/vllm-rows` at 8f981ee ([vllm-layout](findings/vllm-layout.md), "Stack, engine and network
-path", B). Every row is `--restart unless-stopped` and comes back by itself after a reboot (I).
-llama.cpp is gone from all three hosts (H). Each purpose has one host, and there is no failover:
+`host/vllm-rows` at 8f981ee, where every figure was measured; 90ef16f, the pull request's head,
+adds comments only ([vllm-layout](findings/vllm-layout.md), "Stack, engine and network path",
+B). Every row is `--restart unless-stopped` and comes back by itself after a reboot (I). llama.cpp
+is gone from all three hosts (H). Each purpose has one host, and there is no failover:
 the architect's choice, which dropped the Framework's staged vision and audio failover rows
 (vllm-layout, M), so a down host fails its purpose visibly until it returns.
 
@@ -67,7 +68,7 @@ dipped 0.81 GiB under gb10-1's floor (C.7, N.4).
 
 | Host | Stack | Engine | Serves | Clone | Finding |
 | --- | --- | --- | --- | --- | --- |
-| gb10-1 | DGX OS 7.6.0, kernel 7.0.0-1025-nvidia, driver 580.178.04, CUDA 13.0, Docker 29.6.2 | vLLM v0.33.0, `vllm/vllm-openai:v0.33.0` | the agent row; the store holds `openai/gpt-oss-120b` alone | spike-model-engines on a local `hosts` branch at 8f981ee, before merge | [vllm-layout](findings/vllm-layout.md): stack, B, H, I |
+| gb10-1 | DGX OS 7.6.0, kernel 7.0.0-1025-nvidia, driver 580.178.04, CUDA 13.0, Docker 29.6.2 | vLLM v0.33.0, `vllm/vllm-openai:v0.33.0` | the agent row; the store holds `openai/gpt-oss-120b` alone | spike-model-engines on a local `hosts` branch at 8f981ee, vllm-layout's `host/` change before merge (measured at 8f981ee; 90ef16f adds comments only) | [vllm-layout](findings/vllm-layout.md): stack, B, H, I |
 | gb10-2 | as gb10-1 | as gb10-1 | the vision row; the store holds `nvidia/Gemma-4-26B-A4B-NVFP4` alone | as gb10-1 | [vllm-layout](findings/vllm-layout.md): stack, B, H, I |
 | framework | Omarchy, kernel 7.2.15-1-omarchy, Mesa 26.2.5, linux-firmware 20260916, Docker 29.9.2; GTT 112 GiB through `ttm.pages_limit` alone, the deprecated gttsize option removed | vLLM v0.33.0, ROCm 10.0, `vllm/vllm-openai-rocm:v0.33.0`; the audio row on the built audio image | the audio and embedding rows; the store holds E4B and granite | as gb10-1 | [vllm-layout](findings/vllm-layout.md): stack, B, H, I |
 
@@ -100,9 +101,9 @@ it.
    workstation purpose has a second host. Audio has no headroom above its target of 4 (vllm-layout,
    N.2).
 5. **Model management only through the gateway, never a serving API.** A client that can change
-   a workstation's models through the serving API is a vulnerability (the architect, 2026-11-12);
-   the rows start from `host/engines` on the host, and the gateway is the single secure point that
-   manages them (spike-model-engines' answer in the coordinator's `ai-hosting.md`, its requirement
+   a workstation's models through the serving API is a vulnerability (the architect); the rows
+   start from `host/engines` on the host, and the gateway is the single secure point that manages
+   them (spike-model-engines' answer in the coordinator's `ai-hosting.md`, its requirement
    "Model management separated from inference and held by an admin").
 6. **No failover.** Each purpose has one host, by the architect's choice, so a down host fails its
    purpose visibly: the gateway reports it and overflows, and never routes vision or audio to a
@@ -136,11 +137,10 @@ purposes. The layout changes them; as requirements for the intake:
 
 - **On-demand loading.** The capabilities are designated and their memory layouts essentially
   settled; GPU compute, not memory, is the bottleneck, and loading and unloading add compute on top
-  of inference (the architect, 2026-11-12; goal record, the plan's decisions). Every row stands
-  loaded.
+  of inference (the architect; goal record, the plan's decisions). Every row stands loaded.
 - **Two-node serving** over QSFP with vLLM and Ray. vLLM instances, one model each, spread across
-  gb10-1 and gb10-2 replace pooling the GB10s for the agent (the architect, 2026-11-12). The agent
-  holds 12 sessions of 131,072 tokens on gb10-1 alone (vllm-layout, D).
+  gb10-1 and gb10-2 replace pooling the GB10s for the agent (the architect). The agent holds 12
+  sessions of 131,072 tokens on gb10-1 alone (vllm-layout, D).
 - **Redundancy and failover.** The Framework's staged vision (Gemma 4 12B QAT w4a16) and audio
   failover rows were dropped when audio moved to the Framework and gb10-2 took vision alone
   (vllm-layout, M); the 12B was never measured (G.3).
