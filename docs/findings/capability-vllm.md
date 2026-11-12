@@ -1,7 +1,9 @@
 # Finding: the capability models on vLLM v0.33.0 against llama.cpp on gb10-2 and the Framework
 
 Measured 2026-11-11, task `capability-vllm`. This finding is dated: every figure holds for the
-versions, stack, rows, sections and network path below, on that day, and nothing after it.
+versions, stack, rows, sections and network path below, on that day, and nothing after it, but
+the architect's walkthrough, run on 2026-11-12 on the same stack, whose figures hold for that day
+(P).
 
 **What it establishes.** The finding answers evidence 3 and 5 for the capability purposes (vision,
 audio, embedding) on vLLM v0.33.0 against llama.cpp b12098, in one session, per host: gb10-2 (CUDA)
@@ -63,6 +65,11 @@ It also found that:
 - llama.cpp's vision errored 5 requests in all with the Gemma 4 output parser's `peg-gemma4`
   error; vLLM's rows errored none, and their server logs held no error line in any cell (L).
 
+The architect's walkthrough, on 2026-11-12, restarted the Framework's three vLLM rows and reran
+V-vision's level 1 as its own cell: the vision row's sizing (E) and its level 1 (G.2) reproduce, its
+start ran about 68 s from StartedAt against C's 100.8 s on an otherwise empty GPU, the embedding
+row's health went unconfirmed, and the restore's loads and GTT match K's (P).
+
 **The conclusion, as evidence.** The spike records it and decides nothing.
 
 - On this session's figures, **vLLM is the stronger capability engine on both hosts for each
@@ -90,13 +97,14 @@ knee, or, where it found none, the highest level meeting it ([role-split](role-s
 **Which figures size the layout.** Production clients sit on the same direct network as the GPUs,
 so the layout is sized on LAN figures (role-split's decision). Every run with a recorded ping went
 direct on the LAN, 0 to 2 ms ("Stack, engine and network path"), so client-side and server-side
-figures both stand as LAN figures.
+figures both stand as LAN figures; the architect's walkthrough, a reproduction, recorded no ping
+(P).
 
 | Host | Serves at the end of the session (Behavior 13) |
 | --- | --- |
 | gb10-1 | as agent-vllm left it: `gpt-oss-120b-MXFP4-agent-only` on llama.cpp (`llama` up 2 hours at the stack read), the `vllm` container Exited (0); clone on `main` at a294e4e, agent-vllm's merge. Read only, for the stack |
 | gb10-2 | llama.cpp's `gemma-4-26B-A4B-it-qat-Q4_0-16-slots`, `gemma-4-E4B-it-Q8_0-16-slots` and granite, reloaded fresh at 22:58:18Z: 77.51 GiB available. `vllm-vision`, `vllm-audio` and `vllm-embed` Exited (0), the image `vllm/vllm-openai:v0.33.0` (d825baf9ce4b), the compile cache (438M) and the three models' safetensors kept. spike-model-engines' clone on a local `hosts` branch at bb68cbd, the pull request's head, moved from 4ad76e6 after the reviews; every run measured at 4ad76e6 ("Commands not in a step log") |
-| framework | llama.cpp's capped `google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0` and `ggml-org/gemma-4-E4B-it-GGUF:Q8_0` and granite, reloaded fresh at 22:58:18Z: 82.97 GiB GTT and 89.02 GiB system memory available. The three vLLM containers Exited (0); `vllm/vllm-openai-rocm:v0.33.0` and `:v0.33.0-rocm72`, both audio images, the compile cache (982M) and the safetensors kept. Clone on a local `hosts` branch at bb68cbd, moved from 4ad76e6 as gb10-2's |
+| framework | llama.cpp's capped `google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0` and `ggml-org/gemma-4-E4B-it-GGUF:Q8_0` and granite, reloaded fresh at 22:58:18Z: 82.97 GiB GTT and 89.02 GiB system memory available. Reloaded again in the architect's walkthrough (6.1, 6.1 and 3.1 s): GTT 82.97 and system 87.55 GiB available, read 2026-11-12T10:50:30Z after 30 s idle with no cache drop (P). The three vLLM containers Exited (0) at the restore's read, and stopped again after the walkthrough, as its commands left it; `vllm/vllm-openai-rocm:v0.33.0` and `:v0.33.0-rocm72`, both audio images, the compile cache (982M) and the safetensors kept. Clone on a local `hosts` branch at bb68cbd, moved from 4ad76e6 as gb10-2's |
 
 ## Stack, engine and network path
 
@@ -895,6 +903,7 @@ None of these is decided here.
 | V-mixed | gb10-2; framework, one at a time | as L-mixed | as L-mixed | 240 s each, about 4.5 min | direct, 0-1 ms | one host at the targets on vLLM (H) |
 | V-two | gb10-2 and framework at once | as L-two, `v-two.sh` | as L-two | 240 s each, about 4.5 min | direct, 1 ms | two hosts at the targets on vLLM (I, J) |
 | Restore | gb10-2, framework at once | the run logs saved; `docker stop` of the three containers; `docker start llama`; `unload --all`, cache drop, the three sections, 30 s idle, read | none | 33.3 s; 15.3 s of loads | direct, 1 ms | Behavior 13's state |
+| Walkthrough (slice 4), 2026-11-12 | framework | the architect's shell: `docker stop llama`, a cache drop, `docker start` of the three rows, the vision row timed to the echo line; `memory` and `footprint`; `cell`, `bench/framework-walk-vision.yaml`, the vision row; `docker stop` of the three; `docker start llama`; `load` of the three sections; 30 s idle; `memory` | 1 stream, the 1440p image question | about 68 s start from StartedAt; 60 s cell; 6.1, 6.1 and 3.1 s loads | no ping recorded | the vision row's sizing and V-vision's level 1, reproduced (P) |
 
 Every cell ran under `watch`, memory sampled every 10 s, capped at 10 min: floor 12.2 GiB on gb10-2
 (`MEASURE_FLOOR_GIB`), 11.2 GiB GTT and 12.5 GiB system memory on the Framework
@@ -1302,6 +1311,7 @@ each payload, which is `base64 -w0` of `probes/probe-image.png` and of `probes/p
 ### Commands as run (framework)
 
 From `.state/measure/framework/2026-11-11.log`, by the same rule, from the stack read at 14:12:00.
+The architect's walkthrough, in `.state/measure/framework/2026-11-12.log`, is quoted in P.
 
 ```
 14:12:00  : 'capability-vllm stack on framework: pending updates, kernel, Mesa, ROCm-facing kernel driver, Docker, firmware, Tailscale, the engine containers and images, the clone, the drop-caches rule (read only)'
@@ -1981,3 +1991,168 @@ curl -s https://hub.docker.com/v2/repositories/vllm/vllm-openai-rocm/tags/v0.33.
 curl -s https://hub.docker.com/v2/repositories/vllm/vllm-openai-rocm/tags/v0.33.0-rocm72 | jq -r .digest
 # sha256:4fe7bc121cbe2f0791ebc38dcc2f0d615612233b4bfc0c1f4b9daeab05aba182
 ```
+
+## P. The architect's walkthrough (slice 4)
+
+The architect ran slice 4 on the Framework on 2026-11-12, at about 05:35-05:51 local
+(10:35-10:51Z), from their own shell on the laptop. It stops `llama`, starts the three stopped vLLM
+rows on the ROCm 10.0 image with the compile cache warm, timing the vision row's start, reads its
+sizing and both pools, reruns V-vision's level 1 as its own cell,
+[`bench/framework-walk-vision.yaml`](../../bench/framework-walk-vision.yaml) (1 stream, 60 s,
+role-split-vision-full's image question; the framework task's walkthrough cell, reused unchanged,
+with the vLLM row's served name as its section), and restores llama.cpp's three sections. It
+reproduces the vision row's sizing (E) and its level 1 (G.2).
+
+**Two records.** The commands before the helpers were sourced, the starts and their timer, and
+the `docker logs` search ran in the architect's shell, outside the step log; the architect pasted
+their output (`.state/capability-vllm/walkthrough-architect.txt`), except the ping's, the
+`docker stop llama`'s, the cache drop's and the vision and audio `docker start` lines'. `memory`,
+`footprint`, `cell`, `jq` and `load` are in the Framework's step log
+(`.state/measure/framework/2026-11-12.log`, the whole of it), and the cell's files are
+`.state/measure/framework/capability-vllm-walk-vision.{json,log,watch.tsv,exit}` (`.exit` reads 0).
+The session gave `tailscale ping -c 1 framework` as the first command, and no output of it was
+pasted or logged, so **no ping exists for the walkthrough**.
+
+From the architect's paste, outside the step log, in the order run:
+
+```
+tailscale ping -c 1 framework                                # output not pasted
+ssh framework docker stop llama                              # output not pasted
+ssh framework sudo -n /usr/bin/sysctl vm.drop_caches=3       # output not pasted
+t0=$(date +%s); ssh framework docker start vllm-vision       # output not pasted
+until curl -sf -o /dev/null http://framework:8000/health; do sleep 2; done
+echo "vision start $(( $(date +%s) - t0 )) s"                # vision start 218 s
+ssh framework docker start vllm-audio                        # output not pasted
+until curl -sf -o /dev/null http://framework:8001/health; do sleep 2; done
+ssh framework docker start vllm-embed                        # vllm-embed
+until curl -sf -o /dev/null http://framework:8002/health; do sleep 2; done   # interrupted with ^C
+ssh framework 'docker logs --since "$(docker inspect -f {{.State.StartedAt}} vllm-vision)" vllm-vision 2>&1 | grep -E "KV cache|Model loading took|attention backend|startup complete"'
+```
+
+Then, in log order, local time (UTC−5), as the step log has them:
+
+```
+05:43:07  # the step helpers sourced for the Framework on port 8000: the log's "measure log for
+          # framework (http://framework:8000)" line; the paste: source scripts/measure-lib.sh framework 8000
+05:43:12  export MEASURE_FLOOR_GIB=11.2 MEASURE_SYSTEM_FLOOR_GIB=12.5
+05:43:16  memory
+05:43:17  footprint
+05:43:35  cell capability-vllm-walk-vision framework-walk-vision google/gemma-4-26B-A4B-it google/gemma-4-26B-A4B-it
+05:48:38  jq -r --arg purpose vision -f bench/levels.jq .state/measure/framework/capability-vllm-walk-vision.json
+05:48:55  clear
+05:48:56  ssh framework docker stop vllm-vision vllm-audio vllm-embed
+05:49:02  ssh framework docker start llama
+05:49:22  clear
+05:49:28  source scripts/measure-lib.sh framework
+05:49:33  load google/gemma-4-26B-A4B-it-qat-q4_0-gguf:Q4_0
+05:49:41  load ggml-org/gemma-4-E4B-it-GGUF:Q8_0
+05:49:52  load mrutkows/granite-embedding-english-r2-GGUF:BF16
+05:50:00  sleep 30
+05:50:30  memory
+```
+
+The two `clear` lines are in the log and not in the paste. The paste's `docker logs` search printed
+no attention-backend line: its pattern, "attention backend", doesn't match "Using TRITON_ATTN
+backend"; `footprint`'s start log has the line. The cache drop's output and the vision and
+audio `docker start` lines' weren't pasted, so the drop isn't confirmed on record; the start log's
+figures below are.
+
+**The start** (`docker start vllm-vision`, the container started 10:35:46.69Z), against C and E:
+
+| | First start (C, E) | Cold start (C, E) | Walkthrough |
+| --- | --- | --- | --- |
+| How it started | `host/engines vllm install`, compiling, the other two rows not yet installed | `docker start`, cache dropped, the other two rows serving, compile cache warm | `docker start`, after a cache drop whose output wasn't pasted, `llama` and the other two rows stopped, compile cache warm |
+| From StartedAt | 168.3 s | 100.8 s | **about 68 s** (c), to shortly after 10:36:54Z |
+| From the command | 169.1 s | 100.9 s | none: "vision start 218 s" is to the echo line, not to `/health` 200 |
+| Model loading | 48.6 GiB in 17.36 s | 48.6 GiB in 20.43 s | 48.6 GiB in **17.32 s** |
+| Compile | 40.44 s | "Directly load AOT compilation" | "Directly load AOT compilation" from the same `469acdf7…` path |
+| Graph captures | 10 s, then 2 s | 9 s, then 2 s | 2 s, then 2 s; 0.28 and 0.22 GiB |
+| KV cache | 17.4 GiB; 109,059 tokens, 13.31x | 17.4 GiB; 109,055 tokens, 13.31x | **17.4 GiB; 109,055 tokens, 13.31x** |
+| Free memory at startup | 111.73 GiB | 90.78 GiB | 111.73 GiB |
+| Weights + non-torch | 49.03 GiB | 49.03 GiB | 49.03 GiB |
+| Backends (F) | TRITON_ATTN; TRITON, then TritonExperts | the same | the same |
+
+The last timed line of the start log is the second graph capture and the free-memory line at
+10:36:54Z, 67.3 s after StartedAt (c); "Application startup complete" follows it with no time in
+either source, so the start ran about 68 s from StartedAt (c), against the cold start's 100.8 s.
+**"vision start 218 s" is not a start time**: it measures from `t0` to when the architect typed
+the echo line after the `until` loop returned, about 150 s after the start log's last timed line
+(c: 218 − 68). The sizing reproduces exactly: the cold start's 17.4 GiB, 109,055 tokens and
+13.31x, the same 49.03 GiB consumed, the same backends. Two things differ from the cold start, and
+neither was isolated: the row started with nothing else on the GPU (111.73 GiB free, the first
+start's figure), and its first graph capture took 2 s against 9 s, the span from the KV line to
+the second capture's end 3 s against 23 s (c: 10:36:51-10:36:54Z; 22:12:19-22:12:42Z). The weight
+load, 17.32 s, sits between the first start's 17.36 s and the cold start's 20.43 s. The pool wasn't
+read before the start, and no sampler ran during it.
+
+**Audio and embedding.** The audio row's `until` loop on port 8001 returned, so its `/health`
+answered 200. The architect interrupted the embedding row's wait on port 8002 (^C); the container
+had started (`docker start` printed `vllm-embed`), but **nothing confirms the embedding row's
+health**: no `/health` 200, no start log and no probe was read for it.
+
+**The idle read** (10:43:16Z, `memory` and `footprint`):
+
+| | vLLM idle (D, K) | Walkthrough |
+| --- | --- | --- |
+| Before the read | probes, one warm-up request a row, 30 s idle, a page-cache drop | none: straight after the starts, no warm-up, no drop |
+| GTT (`memory`) | 22.87 GiB, 11.67 above the floor | **23.01 GiB**, 11.81 above the floor (c) |
+| System memory (`memory`) | 16.52 GiB, 4.02 above the floor | **15.81 GiB**, 3.31 above the floor (c) |
+| GTT used (`footprint`'s pool line) | 89.13 GiB | 88.99 GiB |
+| Vision container GTT / RSS | 69,486 / 6,084 MiB | 69,353 / 6,598 MiB |
+
+The walkthrough's GTT reads 0.14 GiB more than D's and its system memory 0.71 GiB less (c). The
+difference in method likely accounts for both: D's read followed a warm-up, 30 s idle and a
+page-cache drop; this one came straight after the starts, with none of the three. Neither was
+isolated, so this records the difference, not its cause. The GTT read is close to D's with all
+three rows loaded, which fits the embedding row having loaded (its container held 753 MiB of GTT
+in D), but that is a reading, not a confirmation. The Framework's vLLM idle figures stay D's.
+
+**The cell** (10:43:35-10:44:55Z under `watch`; GuideLLM's 60 s), from `bench/levels.jq`, against
+V-vision's level 1 (G.2) read from `capability-vllm-v-vision.json` by the same program:
+
+| | V-vision, level 1 (G.2) | Walkthrough |
+| --- | --- | --- |
+| Requests ok / errored / incomplete | 12 / 0 / 1 | 12 / 0 / 1 |
+| Output tok/s, completed (every-token) | 20.00 (21.42) | 20.00 (21.5) |
+| Requests a second | 0.200 | 0.200 |
+| TTFT median | 542 ms | 550 ms |
+| ITL median / p95 | 41.26 / 41.27 ms | 41.26 / 41.32 ms |
+| Request latency median / p90 / min | 4.63 / 4.63 / 4.62 s | 4.64 / 4.65 / 4.63 s |
+| Within 10 s | 12 of 12 | 12 of 12 |
+| Prompt tok/s | 96 | 96 |
+| Floor (latency ≤10 s) | meets | meets |
+
+Level 1 reproduces: the same completed requests and output, ITL median the same to the hundredth
+of a millisecond, TTFT 8 ms higher and latency 0.01 s higher (c). The step log's summary line reads
+the same: 12 ok, 0 errored, 1 incomplete of 13; 20 tok/s completed, 21.5 every-token; TTFT median
+550 ms; ITL median 41.26 ms.
+
+**Errors and memory through the cell.** The readout since 10:43:35Z: ERROR lines 0, Harmony or
+parser errors and warnings 0, HarmonyError lines 0, responses ≥400 0; vLLM's counters since the
+container's start: 12 requests ok, error 0, preemptions 0, KV cache use 0.0% after. `watch`'s 8
+samples held the lowest GTT, **22.88 GiB** (23429 MiB), from 10:43:55Z to the end, 11.68 above its
+floor (c), and the lowest system memory, **15.57 GiB** (15945 MiB, 10:43:55Z), 3.07 above its floor
+(c); `readout`'s `memory` just after, with no drop, read GTT 22.88 and system 15.53 GiB. During
+V-vision's level 1, `watch`'s samples (22:37:33-22:38:13Z) read GTT 22.76 GiB (23306 MiB) and system
+memory down to 14.38 GiB (14728 MiB) (c); like the idle read, the walkthrough's cell started from a
+different pool, and it read 1.19 GiB more system memory at its lowest (c).
+
+**The restore** (`docker stop` of the three containers, `docker start llama`, then `load` of the
+three sections from 10:49:33Z): loaded in **6.1, 6.1 and 3.1 s**, as C's llama.cpp loads, with the args in
+"Stack, engine and network path"; after `sleep 30`, `memory` read **GTT 82.97 and system 87.55
+GiB**, against the restore's 82.97 / 89.02 and the llama.cpp idle read's 82.97 / 88.29 (K): GTT the
+same, system memory 1.47 GiB under the restore's (c). The architect's sequence ran no page-cache
+drop before this read, where K's reads each followed one.
+
+**What it establishes.** The vision row's sizing reproduces exactly, 17.4 GiB of KV for 109,055
+tokens and 13.31x, with TRITON_ATTN and TritonExperts, and so does V-vision's level 1: the floor
+met, every request within 10 s, TTFT, ITL and latency within run noise, no errors and no
+preemption. The start ran about 68 s from StartedAt, against the cold start's 100.8 s, on an
+otherwise empty GPU; what made it faster wasn't isolated. The idle pool read 0.71 GiB lower in
+system memory with no warm-up and no drop, a difference of method not isolated here. The embedding
+row's health is unconfirmed. The restore's loads and GTT match K's.
+
+The Framework ends in Behavior 13's state again: llama.cpp's capped 26B-A4B and E4B and granite
+loaded, the three vLLM containers stopped (`docker stop` printed all three). No `docker ps` or
+compile-cache size was read after the walkthrough, so the containers' state is as the commands
+left it.
