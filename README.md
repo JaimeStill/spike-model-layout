@@ -32,7 +32,7 @@ The evidence behind each placement:
   vision 16 requests against 1 on gb10-2 ([agent-vllm](docs/findings/agent-vllm.md),
   capability-vllm).
 - **The agent's FP8 KV row**: no significant loss against BF16 at 95% on GPQA diamond or RULER,
-  though 198 questions can't exclude a few points (vllm-layout, C).
+  though 198 questions can't exclude a loss of up to about 10 points (vllm-layout, C).
 - **NVFP4 vision**: no significant loss against Google's BF16 on mmmu_val (vllm-layout, G).
 - **Audio beside embedding on the Framework**: it holds beside embedding at a steady 34 requests
   a second and not beside embedding run flat out, nor beside vision on gb10-2 (vllm-layout, E, F).
