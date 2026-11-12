@@ -1,8 +1,8 @@
 # goal · experiment.hosting.spike-model-layout
 
-- **State:** brief ready
-- **Task:** capability-vllm
-- **Branch:** capability-vllm
+- **State:** idle
+- **Task:** none
+- **Branch:** none
 
 ## Tasks
 
@@ -11,7 +11,7 @@
 3. [x] role-split
 4. [x] framework
 5. [x] agent-vllm
-6. [ ] capability-vllm
+6. [x] capability-vllm
 7. [ ] on-demand
 8. [ ] two-node
 9. [ ] answer
@@ -295,10 +295,6 @@ Door          two-way: the rows, suite changes and audio image revert by
               the task can't be undone.
 ```
 
-## Progress
-
-slices 4/4 committed (slice 1: engines 4ad76e6, layout b55d744; slice 2: layout c881c29; slice 3: layout b2f432c) · standards done (88c6b2f, 760cfc7, bb68cbd) · spec done, gaps closed (8a1e147; the audio probe rerun's path and the staged `-rocm72` images, Decisions) · editor done · slice 4 recorded (c8a1be1)
-
 ## Decisions
 
 - setup: kind context; check `mise run check`, currency `mise run currency`, no gate; public GitHub with `gh pr create` and `gh pr merge --merge --delete-branch`, no CI — copied from spike-hosting-upgrades.
@@ -502,6 +498,7 @@ slices 4/4 committed (slice 1: engines 4ad76e6, layout b55d744; slice 2: layout 
 - capability-vllm (BUILD, standards review): throwaway Python helpers (`imports.py`, `mkprobes.py` and an inline `python3 -` edit) ran untracked, against STANDARDS.md's rule that no Python is authored; nothing tracked depends on them, and the finding says so (760cfc7).
 - capability-vllm (BUILD): after the reviews, gb10-2's and the Framework's clones moved to bb68cbd, a comment-only change; every figure was measured at 4ad76e6.
 - capability-vllm (BUILD): the Framework's system memory came closest to its floor during the vLLM vision sweep, 0.76 GiB above 12.5 GiB, under the 0.60, 0.18 and 0.03 fractions. It is reported as found; nothing was rerun or changed.
+- capability-vllm (accept): queueing the capability host by GPU compute pressure, not free memory, is the gateway's: admit on the engines' live latency and queue signals against each purpose's floor (vLLM and llama.cpp `/metrics`), since gb10-2's mixed cell missed vision with ~19 GiB free above its floor; carried to the answer task's routing requirements for spike-model-gateway (the architect).
 
 ## Pending edits
 
