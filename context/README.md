@@ -4,9 +4,9 @@ spike-model-layout is where the workstations' three memory pools get their layou
 gb10-1, gb10-2 and the Framework each serve, at what context, and for how many concurrent
 sessions. It measures each placement with GuideLLM in capped runs on all three hosts, weighs a
 full set on one GB10 against splitting the roles across both GB10s, compares vLLM with llama.cpp,
-and tunes the layout the architect chose: vLLM instances, one model each, across gb10-1 and
-gb10-2, with the Framework as backup compute. It gives the layout v1.ai.hosting specifies as
-evidence. The spike decides nothing itself.
+and tunes the layout the architect chose: vLLM instances, one model each, gb10-1 serving the
+agent, gb10-2 vision, and the Framework audio and embedding. It gives the layout v1.ai.hosting
+specifies as evidence. The spike decides nothing itself.
 
 The spike is the sub-goal `experiment.hosting.spike-model-layout` in the coordinator's roadmap,
 `standards-lab/context/roadmap.toml`, where its tasks live. Its question is framed in
@@ -18,6 +18,10 @@ spike-hosting-upgrades.
 
 How are models placed across the three workstations' memory pools to make the best use of memory,
 and what context and how many concurrent sessions does each placed model hold?
+
+## The answer
+
+The answer is in the top-level [`README.md`](../README.md#the-answer).
 
 ## The evidence
 
@@ -46,10 +50,11 @@ and what context and how many concurrent sessions does each placed model hold?
 7. The vLLM layout tuned: the agent row's KV dtype settled by an FP8-against-BF16 accuracy check;
    the capability pool's concurrency tuned across vision, audio and embedding together, with a
    strategy that keeps them from competing for compute; a lighter Gemma 4 vision model for the
-   Framework's vLLM ROCm engine; v0.34 against v0.33.0; and the standing layout at the load
-   targets.
+   Framework's vLLM ROCm engine (dropped when the Framework took audio and embedding, escalation
+   2); v0.34 against v0.33.0 (v0.34 unreleased, so the hosts stay on v0.33.0); and the standing
+   layout at the load targets.
 8. Not pursued: two-node serving over QSFP. One model per instance across the GB10s replaces
-   pooling them (the architect, 2026-11-12).
+   pooling them (the architect).
 9. The layout: per host, its purposes, models, context, slots and load targets; what it needs from
    routing (session stickiness, overflow) and model management as requirements for
    spike-model-gateway; the host descriptors' purposes and load targets as requirements for the
@@ -99,10 +104,17 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
   and embedding, each in its own process,
   [`docs/findings/capability-vllm.md`](../docs/findings/capability-vllm.md).
 - **On-demand serving** through llama.cpp's router: not pursued, since GPU compute, not memory, is
-  the bottleneck (the architect, 2026-11-12).
+  the bottleneck (the architect).
 - **Two-node serving** over QSFP with vLLM and Ray: not pursued, since one model per vLLM instance
-  across the GB10s replaces pooling them (the architect, 2026-11-12).
-- **The layout document:** [`docs/layout.md`](../docs/layout.md), living, finalized by the answer.
+  across the GB10s replaces pooling them (the architect).
+- **The tuned vLLM layout** measured as it stands: the agent's FP8 KV row settled by the accuracy
+  check, gb10-2's and the Framework's cells that placed vision, audio and embedding, the NVFP4
+  vision check, llama.cpp's removal, each host's reboot, and the standing cell at the load targets,
+  [`docs/findings/vllm-layout.md`](../docs/findings/vllm-layout.md).
+- **The accuracy check:** lm-evaluation-harness 0.4.13 in the bench environment, run against a
+  host's OpenAI API, its paired per-question test read by `bench/paired.awk`.
+- **The layout document:** [`docs/layout.md`](../docs/layout.md): the layout per host,
+  the requirements for spike-model-gateway and for the intake, and what was not pursued.
 - **The step helpers:** `scripts/measure-lib.sh`, adapted from spike-hosting-upgrades' without its
   tier and conform helpers, sourced and called one step at a time, logging every command to this
   spike's `.state/measure/<host>/`. The read-only `footprint` helper prints each llama-server
@@ -115,8 +127,9 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
   without the system-memory floor (`MEASURE_SYSTEM_FLOOR_GIB`) and stops a cell under either floor.
 - **The result readers:** `bench/levels.jq` turns GuideLLM's result JSON into per-level tables
   judged against each purpose's floor, `bench/srvtimes.awk` with `bench/stats.awk` reads each
-  request's server timings from the router log, and `bench/capacity.jq` with `bench/readouts.awk`
-  reads the vLLM capacity cell, [`bench/README.md`](../bench/README.md).
+  request's server timings from the router log, `bench/capacity.jq` with `bench/readouts.awk`
+  reads the vLLM capacity cell, and `bench/paired.awk` pairs two accuracy runs per question,
+  [`bench/README.md`](../bench/README.md).
 
 ## Path
 
@@ -142,13 +155,15 @@ and load targets are agreed in its task's own plan round.
    Framework (vLLM ROCm), against llama.cpp's sections rerun in the same session; a pull request
    to spike-model-engines' `host/` first gives each row its own container, port and memory fraction
    (evidence 3, 5, beside 6).
-7. `vllm-layout`: vLLM instances, one model each, across gb10-1 and gb10-2, with the Framework as
-   backup compute, tuned and measured at the load targets, with the FP8-against-BF16 accuracy
-   check as the task's one new tool; the hosts end on that layout, with llama.cpp removed from the
-   workstations. Then the answer: `docs/layout.md` finalized, the routing and model-management
-   requirements for spike-model-gateway, README "The answer", and the answer section in
-   `ai-hosting.md` (evidence 7, 9). It may take up to five slices, the last a walkthrough: the
-   one exception to the rules' four.
+7. `vllm-layout`: vLLM instances, one model each, tuned and measured at the load targets, with
+   the FP8-against-BF16 accuracy check as the task's one new tool. The measurements moved the
+   placement: audio missed beside vision on gb10-2 and held beside rate-limited embedding on the
+   Framework, so the hosts end on gb10-1 the agent, gb10-2 vision, and the Framework audio and
+   embedding, with no failover and llama.cpp removed from the workstations. Then the answer:
+   `docs/layout.md` finalized, the routing and model-management requirements for
+   spike-model-gateway, README "The answer", and the answer section in `ai-hosting.md` (evidence
+   7, 9). It may take up to five slices, the last a walkthrough: the one exception to the rules'
+   four.
 
 ## References
 

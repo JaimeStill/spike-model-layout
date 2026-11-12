@@ -3,15 +3,16 @@
 #   jq -r --arg purpose <agent|vision|audio|embed> -f bench/levels.jq <result.json>...
 #   jq -r --arg purpose client [--argjson level <i>] -f bench/levels.jq <result.json>...
 #
-# A purpose prints the knee GuideLLM concluded, then one row a level: streams, requests ok /
-# errored / incomplete, output tok/s, requests/s, TTFT median, ITL median and p95 (GuideLLM's
-# own), request latency median, p90 and min, for vision the count at latency <=10 s, prompt tok/s,
-# RTFx median and min and the count at RTFx >=5, the level's duration, and its floor verdict. The
-# two counts are "met/successful", the per-request reading of the floor beside its median verdict.
-# Latency and RTFx are computed here from each successful request: latency is request_end_time -
-# request_start_time, RTFx is input_metrics.audio_seconds over that latency. The floors: agent ITL
-# median <=100 ms, vision latency median <=10 s, audio RTFx median >=5, embed mean prompt tok/s
-# >=4300; a level with no successful request misses.
+# A purpose prints the knee GuideLLM concluded, then one row a level: its streams (or "rate <r>" on
+# a constant-rate level), requests ok / errored / incomplete, output tok/s, requests/s, TTFT
+# median, ITL median and p95 (GuideLLM's own), request latency median, p90 and min, for vision the
+# count at latency <=10 s, prompt tok/s, RTFx median and min and the count at RTFx >=5, the
+# level's duration, and its floor verdict. The two counts are "met/successful", the per-request
+# reading of the floor beside its median verdict. Latency and RTFx are computed here from each
+# successful request: latency is request_end_time - request_start_time, RTFx is
+# input_metrics.audio_seconds over that latency. The floors: agent ITL median <=100 ms, vision
+# latency median <=10 s, audio RTFx median >=5, embed mean prompt tok/s >=4300; a level with no
+# successful request misses.
 #
 # `client` prints GuideLLM's own per-request timings for one level (index `level`, default 0),
 # successful requests in order of request_start: the gap from the previous request's end to this
@@ -46,6 +47,9 @@ def fixed($d):
 
 def name: input_filename | split("/") | last;
 
+# A level's name: its streams, or "rate <r>" on a constant-rate level.
+def level_name: .config.strategy | .streams // "rate \(.rate)" | tostring;
+
 def knee:
   (.conclusions // [])[] | (.initial.throughput // {})
   | "knee: \(.status) knee \(.knee) breakpoint \(.breakpoint_concurrency) saturation \(.saturation_concurrency) (\(.reason))";
@@ -62,7 +66,7 @@ def level($purpose):
      elif $purpose == "vision" then ($lat | length) > 0 and $latm <= 10
      elif $purpose == "audio" then ($rtfx | length) > 0 and ($rtfx | median) >= 5
      else $ptps >= 4300 end) and $rt.successful > 0) as $ok
-  | [ (.config.strategy.streams | tostring),
+  | [ level_name,
       "\($rt.successful)/\($rt.errored)/\($rt.incomplete)",
       ($m.output_tokens_per_second.successful.mean | fixed(2)),
       ($m.requests_per_second.successful.mean | fixed(3)),
@@ -95,7 +99,7 @@ def client($i):
   .benchmarks[$i] as $b
   | [$b.requests.successful[]] | sort_by(.info.timings.request_start) as $rs
   | [$rs[].info.timings] as $t
-  | "\(name) level \($b.config.strategy.streams): \($rs | length) ok, start \($t[0].request_start | fixed(3))",
+  | "\(name) level \($b | level_name): \($rs | length) ok, start \($t[0].request_start | fixed(3))",
     "previous end -> request_start ms: \([range(1; $t | length) | ($t[.].request_start - $t[. - 1].request_end) * 1000] | spread)",
     "dequeued -> request_start ms: \([$t[] | (.request_start - .dequeued) * 1000] | spread)",
     "request_start -> first chunk ms: \([$t[] | (.first_request_iteration - .request_start) * 1000] | spread)",

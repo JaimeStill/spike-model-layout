@@ -1,0 +1,26 @@
+# vllm-layout's Framework cell F-embed-sweep (Behavior 8): the embedding row,
+# granite-embedding-english-r2 on vLLM's pooling runner (granite-embedding-english-r2-framework,
+# 0.03, max-num-seqs 128, max-num-batched-tokens 65,536), beside the Framework's idle audio row, at
+# 1, 4, 16, 32, 64 and 128 concurrent streams, each level for 30 s, six benchmarks in one run, one
+# JSON, read against the embedding floor (4,300 prompt tok/s): the knee, and the level where
+# throughput stops rising. The requests are F-embed's (role-split-embed.yaml), unchanged: 512
+# synthetic tokens a request to /v1/embeddings; only the levels differ, reaching the row's 128
+# sequences. An embedding has no output tokens, streaming, TTFT, or ITL, so the figures are request
+# latency and throughput. Engine-neutral: the model and its tokenizer
+# (ibm-granite/granite-embedding-english-r2) are given on the command line, as `cell`'s <section>
+# <tokenizer>, the JSON's path by `cell`, and the target in GUIDELLM__SPEC__BACKEND__TARGET. Run
+# from the repository root.
+spec:
+  backend:
+    kind: openai_http
+    request_format: /v1/embeddings
+  profile:
+    kind: concurrent
+    streams: [1, 4, 16, 32, 64, 128]
+  data:
+    - kind: synthetic_text
+      prompt_tokens: 512
+  # Each level stops at 30 s; the requests in flight then are counted incomplete.
+  constraints:
+    - kind: max_duration
+      seconds: 30

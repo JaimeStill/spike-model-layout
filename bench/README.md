@@ -19,6 +19,56 @@ the target in `GUIDELLM__SPEC__BACKEND__TARGET`. Each file's header gives its lo
   engines, on vLLM with the helpers sourced for each row's port and the row's served model
   (the capability-vllm finding,
   [`docs/findings/capability-vllm.md`](../docs/findings/capability-vllm.md)).
+- `vllm-layout-agent.yaml`: the vllm-layout task's gb10-1 cells on the chosen agent row (FP8 KV,
+  max-num-seqs 12): S-agent's 4-turn sessions at the target of 4 and the row's cap of 12, a
+  concurrent sweep, 110 s a level, read with `levels.jq --arg purpose agent`:
+  `cell vllm-layout-fp8-agent vllm-layout-agent openai/gpt-oss-120b openai/gpt-oss-120b`, the
+  helpers sourced for port 8000. The task's accuracy runs (lm-evaluation-harness) are read with
+  `paired.awk`, below.
+- `vllm-layout-vision-alone.yaml`, `vllm-layout-audio-alone.yaml`: the vllm-layout task's gb10-2
+  cells with each row alone beside the other, idle: S-vision's and S-audio's requests and level
+  length unchanged (90 s; 30 s or 64 requests), a concurrent profile at the target of 4 streams in
+  place of the knee sweep, read with `levels.jq --arg purpose vision` and `audio`:
+  `cell vllm-layout-g2-vision-4 vllm-layout-vision-alone nvidia/Gemma-4-26B-A4B-NVFP4
+  google/gemma-4-26B-A4B-it`, the helpers sourced for port 8000, and `cell vllm-layout-g2-audio-4
+  vllm-layout-audio-alone google/gemma-4-E4B-it google/gemma-4-E4B-it` for port 8001. Its pair
+  cells, the two rows together for 240 s at vision + audio 4 + 4, 8 + 8, 4 + 2, 2 + 2 and 2 + 4, run
+  `role-split-mixed-vision.yaml` and `role-split-mixed-audio.yaml` unchanged, each process's
+  streams in its own `GUIDELLM__SPEC__PROFILE__STREAMS` (below).
+- `vllm-layout-vision-capacity.yaml`: the same task's gb10-2 vision row alone at 8 and then 16
+  streams, 90 s a level, the vision-alone requests unchanged: gb10-2's vision-only capacity,
+  `cell vllm-layout-g2-vision-capacity vllm-layout-vision-capacity nvidia/Gemma-4-26B-A4B-NVFP4
+  google/gemma-4-26B-A4B-it`, the helpers sourced for port 8000.
+- `vllm-layout-embed-sweep.yaml`: the same task's Framework embedding row (granite, max-num-seqs
+  128, max-num-batched-tokens 65,536) beside the idle audio row, F-embed's 512-token requests at 1,
+  4, 16, 32, 64 and 128 streams, 30 s a level, read with `levels.jq --arg purpose embed`
+  for the knee and the level where throughput stops rising:
+  `cell vllm-layout-fw-embed-sweep vllm-layout-embed-sweep ibm-granite/granite-embedding-english-r2
+  ibm-granite/granite-embedding-english-r2`, the helpers sourced for port 8002. Its placement
+  cell, audio + embedding 4 + 16 for 240 s, runs `role-split-mixed-audio.yaml` and
+  `role-split-mixed-embed.yaml` unchanged, each process's streams in its own
+  `GUIDELLM__SPEC__PROFILE__STREAMS`; audio missed there, so the 8 + 16 cell planned beside it
+  never ran, and the stress cell below sets audio's cap beside embedding at a steady rate.
+- `vllm-layout-embed-rate-floor.yaml`, `vllm-layout-embed-rate-4x.yaml`: the same task's Framework
+  embedding process at a constant 8.4 and 34 requests a second for 240 s (F-embed's 512-token
+  requests: the floor of 4,300 prompt tok/s, and four times it), beside audio at 4 streams
+  (`role-split-mixed-audio.yaml`, `GUIDELLM__SPEC__PROFILE__STREAMS=4`) started with it:
+  `cell vllm-layout-fw-pair-a4r8-embed vllm-layout-embed-rate-floor
+  ibm-granite/granite-embedding-english-r2 ibm-granite/granite-embedding-english-r2`, the helpers
+  sourced for port 8002. `levels.jq` labels such a level "rate <r>". The 4x file is also the
+  stress cell's embedding process, beside audio at 8 streams (`GUIDELLM__SPEC__PROFILE__STREAMS=8`;
+  at 8 the audio file's 876 rows can run out before 240 s, and its JSON's duration says when):
+  `cell vllm-layout-fw-stress-a8r34-embed vllm-layout-embed-rate-4x ...`, which sets the
+  Framework audio row's cap.
+- The same task's standing-layout cell (Behavior 12), all three hosts at once for 240 s, adds no
+  file: four processes started together, each with the helpers sourced for its host and port.
+  The agent runs `role-split-mixed-agent.yaml` (`vllm-layout-agent.yaml`'s S-agent sessions, at
+  240 s) at 4 on gb10-1 (`cell vllm-layout-standing-agent role-split-mixed-agent
+  openai/gpt-oss-120b openai/gpt-oss-120b`); vision `role-split-mixed-vision.yaml` at 4 on gb10-2
+  (`nvidia/Gemma-4-26B-A4B-NVFP4`); audio `role-split-mixed-audio.yaml` at 4 on the Framework's
+  8001; and embedding `vllm-layout-embed-rate-4x.yaml` on its 8002, since the layout rate-limits
+  embedding at the gateway, so its standing load is the admitted rate, not closed-loop streams.
+  Each JSON is read with `levels.jq` for its purpose.
 
 ## Role-split's cells
 
@@ -165,4 +215,39 @@ the time from the previous request's release to the next proxy line. [`stats.awk
 
 ```sh
 awk -v port=<port> -f bench/srvtimes.awk <log> | sort -k1,1n -k3,3g | awk -f bench/stats.awk
+```
+
+## The paired accuracy test: `paired.awk`
+
+The vllm-layout task runs lm-evaluation-harness 0.4.13 on gb10-1's two agent rows, BF16 then FP8
+KV, with the same flags and seeds, and keeps every question's result (`--log_samples`).
+[`paired.awk`](paired.awk) pairs the two runs of one task on `doc_id`, checks that each pair asked
+the same prompt (`prompt_hash`), and prints each run's accuracy, the discordant pairs b (right on
+BF16, wrong on FP8) and c (the reverse), and McNemar's exact two-sided p-value. FP8's loss is
+significant at 95% when p < 0.05 and b > c. jq cuts each samples file into `doc_id`,
+`prompt_hash` and score; for GPQA the score is `flexible-extract`'s `exact_match`, and for RULER
+the length's key. An id seen twice in one run, such as GPQA cut without its filter's `select`,
+which keeps both filters' lines, is printed and fails the test with exit 1, as no pairs do:
+
+```sh
+cut='select(.filter == "flexible-extract") | [.doc_id, .prompt_hash, .exact_match] | @tsv'
+awk -f bench/paired.awk \
+  <(jq -r "$cut" .state/vllm-layout/lm-eval/bf16-gpqa/openai__gpt-oss-120b/samples_*.jsonl) \
+  <(jq -r "$cut" .state/vllm-layout/lm-eval/fp8-gpqa/openai__gpt-oss-120b/samples_*.jsonl)
+cut='[.doc_id, .prompt_hash, .["32768"]] | @tsv'
+awk -f bench/paired.awk \
+  <(jq -r "$cut" .state/vllm-layout/lm-eval/bf16-niah-32768/openai__gpt-oss-120b/samples_*.jsonl) \
+  <(jq -r "$cut" .state/vllm-layout/lm-eval/fp8-niah-32768/openai__gpt-oss-120b/samples_*.jsonl)
+```
+
+The same task's vision check pairs mmmu_val's 900 questions, NVFP4 on gb10-2 against Google's
+BF16 26B-A4B on the Framework, with the same flags and seeds but the endpoint and model. Its
+samples come one file a subject, 30 of them, and `doc_id` restarts at 0 in each, so the cut keys
+each question by its own id (`doc.id`, e.g. `validation_Accounting_1`) and reads its `acc`:
+
+```sh
+cut='[.doc.id, .prompt_hash, .acc] | @tsv'
+awk -f bench/paired.awk \
+  <(jq -r "$cut" .state/vllm-layout/lm-eval/bf16-mmmu/google__gemma-4-26B-A4B-it/samples_*.jsonl) \
+  <(jq -r "$cut" .state/vllm-layout/lm-eval/nvfp4-mmmu/nvidia__Gemma-4-26B-A4B-NVFP4/samples_*.jsonl)
 ```
