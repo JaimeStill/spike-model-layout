@@ -25,6 +25,16 @@ the target in `GUIDELLM__SPEC__BACKEND__TARGET`. Each file's header gives its lo
   `cell vllm-layout-fp8-agent vllm-layout-agent openai/gpt-oss-120b openai/gpt-oss-120b`, the
   helpers sourced for port 8000. The task's accuracy runs (lm-evaluation-harness) are read with
   `paired.awk`, below.
+- `vllm-layout-vision-alone.yaml`, `vllm-layout-audio-alone.yaml`: the vllm-layout task's gb10-2
+  cells with each row alone beside the other, idle: S-vision's and S-audio's requests and level
+  length unchanged (90 s; 30 s or 64 requests), a concurrent profile at the target of 4 streams in
+  place of the knee sweep, read with `levels.jq --arg purpose vision` and `audio`:
+  `cell vllm-layout-g2-vision-4 vllm-layout-vision-alone nvidia/Gemma-4-26B-A4B-NVFP4 google/gemma-4-26B-A4B-it`,
+  the helpers sourced for port 8000, and `cell vllm-layout-g2-audio-4 vllm-layout-audio-alone
+  google/gemma-4-E4B-it google/gemma-4-E4B-it` for port 8001. Its pair cells, the two rows
+  together at 4 + 4 and 8 + 8 for 240 s, run `role-split-mixed-vision.yaml` and
+  `role-split-mixed-audio.yaml` unchanged, their streams in `GUIDELLM__SPEC__PROFILE__STREAMS`
+  (below).
 
 ## Role-split's cells
 

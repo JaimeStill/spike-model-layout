@@ -1,0 +1,130 @@
+# vllm-layout's gb10-2 cell A-alone (Behavior 6): the audio row, E4B BF16
+# (gemma-4-E4B-it-audio-gb10), alone beside gb10-2's idle vision row, at the audio target of 4
+# concurrent streams for 30 s or 64 requests, read against the audio floor (RTFx >= 5). The
+# requests and the level's length are S-audio's (role-split-audio-split.yaml), unchanged: one
+# LibriSpeech clip with the model card's transcription prompt, the reply at most 256 tokens; only
+# the levels differ, a concurrent profile at 4 alone in place of the knee sweep. It needs
+# GuideLLM's audio extra, which mise.bench.toml installs. Engine-neutral: the model and its
+# tokenizer (google/gemma-4-E4B-it) are given on the command line, as `cell`'s <section>
+# <tokenizer>, the JSON's path by `cell`, and the target in GUIDELLM__SPEC__BACKEND__TARGET. Run
+# from the repository root.
+spec:
+  backend:
+    kind: openai_http
+    request_format: /v1/chat/completions
+    # A transcript is as long as its clip, so no request sets output tokens or ignore_eos; this
+    # caps each reply, sent as max_completion_tokens, should the model not stop.
+    max_tokens: 256
+  profile:
+    kind: concurrent
+    streams: [4]
+  # The two sources are read side by side, one row of each a request, and a level stops when
+  # either runs out. Source 0 is the prompt, from Gemma 4's card ("Transcribe the following speech
+  # segment in {LANGUAGE} into {LANGUAGE} text. ... Only output the transcription, with no
+  # newlines."), once a request: 73 of it, one a clip, where footprint-l3.yaml's 32 stopped the
+  # zip at its 32nd clip. Source 1 is hf-internal-testing/librispeech_asr_dummy, 73 clips from
+  # LibriSpeech's clean validation split, about 9 MB fetched once from Hugging Face. Each level
+  # reads both sources from their start.
+  data:
+    - kind: in_memory_dict
+      data:
+        prompt:
+          - &prompt "Transcribe the following speech segment in English into English text. Only output the transcription, with no newlines."
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+          - *prompt
+    - kind: huggingface
+      source: hf-internal-testing/librispeech_asr_dummy
+      load_kwargs:
+        name: clean
+        split: validation
+  # Only the prompt and the clip: LibriSpeech's own text column is the reference transcript, which
+  # the mapper's defaults would otherwise send as the prompt.
+  data_column_mapper:
+    kind: generative_column_mapper
+    column_mappings:
+      text_column: 0.prompt
+      audio_column: 1.audio
+  # Every clip re-encoded as 16 kHz mono WAV, which llama.cpp's input_audio accepts; the source is
+  # FLAC, which it doesn't.
+  data_preprocessors:
+    - kind: encode_media
+      audio_kwargs:
+        audio_format: wav
+        encode_sample_rate: 16000
+  # Each level stops at 30 s or its 64th request, whichever comes first; the requests in flight
+  # at 30 s are counted incomplete.
+  constraints:
+    - kind: max_duration
+      seconds: 30
+    - kind: max_requests
+      count: 64

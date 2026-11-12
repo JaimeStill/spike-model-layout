@@ -1,0 +1,28 @@
+# vllm-layout's gb10-2 cell V-alone (Behavior 6): the vision row, NVFP4 26B-A4B
+# (gemma-4-26B-A4B-NVFP4-vision-gb10), alone beside gb10-2's idle audio row, at the vision target
+# of 4 concurrent streams for 90 s, read against the vision floor (latency <=10 s). The requests
+# and the level's length are S-vision's (role-split-vision-split.yaml), unchanged: one synthetic
+# 1440p JPEG beside 200 synthetic text tokens, exactly 100 output tokens; only the levels differ, a
+# concurrent profile at 4 alone in place of the knee sweep. It needs GuideLLM's vision extra, which
+# mise.bench.toml installs. Engine-neutral: the model and its tokenizer
+# (google/gemma-4-26B-A4B-it) are given on the command line, as `cell`'s <section> <tokenizer>,
+# the JSON's path by `cell`, and the target in GUIDELLM__SPEC__BACKEND__TARGET. Run from the
+# repository root.
+spec:
+  backend:
+    kind: openai_http
+    request_format: /v1/chat/completions
+  profile:
+    kind: concurrent
+    streams: [4]
+  data:
+    - kind: synthetic_text
+      prompt_tokens: 200
+    - kind: synthetic_image
+      resolution: 1440p
+      format: jpeg
+      output_tokens: 100
+  # The level stops at 90 s; the requests in flight then are counted incomplete.
+  constraints:
+    - kind: max_duration
+      seconds: 90
