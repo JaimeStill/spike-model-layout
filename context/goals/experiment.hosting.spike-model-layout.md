@@ -264,7 +264,7 @@ Door          two-way: rows, pins and suite changes revert by a commit
 
 ## Progress
 
-slices 4/5 committed · standards — · spec — · editor —
+slices 5/5 committed (5 waived) · standards — · spec — · editor —
 
 ## Decisions
 
@@ -544,6 +544,8 @@ slices 4/5 committed · standards — · spec — · editor —
 
 - vllm-layout (BUILD): the reboots: gb10-2 3 min 49 s from reboot to vision serving, gb10-1 8 min 58 s to the agent row, both unattended; the Framework 98 s from down to audio and granite serving, after the architect's LUKS passphrase. After it the Framework reads GTT 120,259,084,288 bytes, no amdgpu.conf, no gttsize line. gb10-1's cold start stayed above its floor (lowest 14.94 GiB; the AOT compile cache loaded). gb10-2's E4B and granite safetensors removed (15.21 GiB).
 - vllm-layout (BUILD): the standing-layout cell, all three hosts at once for 240 s, met every floor: agent 4 ITL 48.13 ms; vision 4 4.49 s (212/212); audio 4 RTFx 5.78; embedding at 34 req/s 17,442 tok/s. Embedding ran at the gateway's rate, not closed-loop, as the layout's standing condition; the agent cell reused role-split-mixed-agent.yaml at 4.
+
+- vllm-layout (BUILD): slice 5's walkthrough waived by the architect, who knows the layout's details from the session and is satisfied with the outcome (as the hosts task's walkthrough was waived); its replacement step (audio 4 beside embedding at 34 req/s, for the dropped failover) was agreed, then waived with the rest.
 
 ## Pending edits
 
