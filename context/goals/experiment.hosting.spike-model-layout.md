@@ -527,6 +527,8 @@ slices 1/5 committed · standards — · spec — · editor —
 
 - vllm-layout (BUILD): the architect ranks gb10-2 vision + embedding (the Framework audio alone) as the absolute fallback, taken only if no tuning lets audio and embedding share the Framework; if it is needed, vision runs at 8 streams beside embedding at steady rates (8.4 and 34 req/s). This replaces escalation 3's answer 3: a miss at the floor's rate leads first to Framework tuning options for the architect, not to GB10 cells.
 
+- vllm-layout (BUILD): audio held beside steady-rate embedding on the Framework: alone RTFx 6.54; beside 8.4 req/s 6.43 (embedding 4,309 tok/s); beside 34 req/s 5.84 (17,442 tok/s); embedding latency 0.02 s. By escalation 3's answer 2 the layout is gb10-1 agent, gb10-2 vision, the Framework audio + embedding, embedding rate-limited by the gateway; 34 req/s (4x the floor) is the measured rate audio tolerates and the stress cell's rate. levels.jq prints `rate <r>` for a constant-rate level.
+
 ## Pending edits
 
 - coordinator · ai-hosting.md "Hosts and access": the drop-caches rule on both GB10s.
