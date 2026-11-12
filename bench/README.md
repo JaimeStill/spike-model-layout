@@ -29,10 +29,10 @@ the target in `GUIDELLM__SPEC__BACKEND__TARGET`. Each file's header gives its lo
   cells with each row alone beside the other, idle: S-vision's and S-audio's requests and level
   length unchanged (90 s; 30 s or 64 requests), a concurrent profile at the target of 4 streams in
   place of the knee sweep, read with `levels.jq --arg purpose vision` and `audio`:
-  `cell vllm-layout-g2-vision-4 vllm-layout-vision-alone nvidia/Gemma-4-26B-A4B-NVFP4 google/gemma-4-26B-A4B-it`,
-  the helpers sourced for port 8000, and `cell vllm-layout-g2-audio-4 vllm-layout-audio-alone
-  google/gemma-4-E4B-it google/gemma-4-E4B-it` for port 8001. Its pair cells, the two rows
-  together for 240 s at vision + audio 4 + 4, 8 + 8, 4 + 2, 2 + 2 and 2 + 4, run
+  `cell vllm-layout-g2-vision-4 vllm-layout-vision-alone nvidia/Gemma-4-26B-A4B-NVFP4
+  google/gemma-4-26B-A4B-it`, the helpers sourced for port 8000, and `cell vllm-layout-g2-audio-4
+  vllm-layout-audio-alone google/gemma-4-E4B-it google/gemma-4-E4B-it` for port 8001. Its pair
+  cells, the two rows together for 240 s at vision + audio 4 + 4, 8 + 8, 4 + 2, 2 + 2 and 2 + 4, run
   `role-split-mixed-vision.yaml` and `role-split-mixed-audio.yaml` unchanged, each process's
   streams in its own `GUIDELLM__SPEC__PROFILE__STREAMS` (below).
 - `vllm-layout-vision-capacity.yaml`: the same task's gb10-2 vision row alone at 8 and then 16
@@ -226,7 +226,8 @@ the same prompt (`prompt_hash`), and prints each run's accuracy, the discordant 
 BF16, wrong on FP8) and c (the reverse), and McNemar's exact two-sided p-value. FP8's loss is
 significant at 95% when p < 0.05 and b > c. jq cuts each samples file into `doc_id`,
 `prompt_hash` and score; for GPQA the score is `flexible-extract`'s `exact_match`, and for RULER
-the length's key:
+the length's key. An id seen twice in one run, such as GPQA cut without its filter's `select`,
+which keeps both filters' lines, is printed and fails the test with exit 1, as no pairs do:
 
 ```sh
 cut='select(.filter == "flexible-extract") | [.doc_id, .prompt_hash, .exact_match] | @tsv'
