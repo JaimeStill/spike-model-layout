@@ -540,6 +540,8 @@ slices 2/5 committed · standards — · spec — · editor —
 
 - vllm-layout (BUILD): the Framework's root is LUKS-encrypted; its reboot needed the architect's passphrase at the console, so it does not return unattended and cannot be rebooted remotely as the GB10s can (Behavior 11 holds for the GB10s only) and its timeline includes the passphrase. Unlocking without a person (TPM2 enrollment, a keyfile) or remotely (SSH in the initramfs) is a security decision outside the task; recorded as an intake note.
 
+- vllm-layout (BUILD): the Framework stays on Omarchy (the architect), after weighing headless Ubuntu Server (parity with the GB10s' Ubuntu base, an LTS cadence) against a newer kernel for gfx1151, the desktop, and re-measuring; the reboot needs a disk-unlock method on either OS.
+
 ## Pending edits
 
 - coordinator · ai-hosting.md "Hosts and access": the drop-caches rule on both GB10s.
