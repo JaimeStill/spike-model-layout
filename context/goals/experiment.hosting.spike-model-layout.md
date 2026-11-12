@@ -516,6 +516,8 @@ slices 1/5 committed · standards — · spec — · editor —
 - vllm-layout (BUILD): BF16's KV came up at 714,316 tokens this start (agent-vllm 846,411); FP8's at 1,733,910, as agent-vllm. The FP8 cold start dipped under the 12.2 GiB floor during graph capture (11.39 GiB at its lowest, 21 s); not an idle read or a cell, so no stop; recorded for slice 3's reboot.
 - vllm-layout (BUILD): FP8 at 12 sessions meets ITL 100 ms by 0.93 ms (99.07 ms; TTFT 15.9 s); at 4, 49.13 ms. The agent bench file is a concurrent sweep at [4, 12] (bench/vllm-layout-agent.yaml).
 
+- vllm-layout (BUILD, escalation 1): on gb10-2 without granite, vision and audio held alone at 4 (4.68 s; RTFx 6.36) but the pair missed: 4+4 audio RTFx 3.19 (vision 9.88 s), 8+8 both. The architect answered: (1) uneven pair cells (vision 4 + audio 2, 2 + 2, 2 + 4, 240 s each) and each row capped at the highest pair where both hold, the 4/4 target reported unmet on one host; (2) one Framework cell, audio 4 beside granite 16, as evidence for moving audio there, the placement unchanged unless the architect changes it; (3) mmmu_val on NVFP4 runs now at num_concurrent 16. The architect asked that every scenario that could give the best performance be evaluated, so gb10-2 also runs vision alone at 8 and 16 (vision-only capacity, should audio move).
+
 ## Pending edits
 
 - coordinator · ai-hosting.md "Hosts and access": the drop-caches rule on both GB10s.
