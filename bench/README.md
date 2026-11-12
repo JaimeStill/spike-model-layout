@@ -39,6 +39,15 @@ the target in `GUIDELLM__SPEC__BACKEND__TARGET`. Each file's header gives its lo
   streams, 90 s a level, the vision-alone requests unchanged: gb10-2's vision-only capacity,
   `cell vllm-layout-g2-vision-capacity vllm-layout-vision-capacity nvidia/Gemma-4-26B-A4B-NVFP4
   google/gemma-4-26B-A4B-it`, the helpers sourced for port 8000.
+- `vllm-layout-embed-sweep.yaml`: the same task's Framework embedding row (granite, max-num-seqs
+  128, max-num-batched-tokens 65,536) beside the idle audio row, F-embed's 512-token requests at 1,
+  4, 16, 32, 64 and 128 streams, 30 s a level, read with `levels.jq --arg purpose embed`
+  for the knee and the level where throughput stops rising:
+  `cell vllm-layout-fw-embed-sweep vllm-layout-embed-sweep ibm-granite/granite-embedding-english-r2
+  ibm-granite/granite-embedding-english-r2`, the helpers sourced for port 8002. Its placement
+  cells, audio + embedding 4 + 16 and 8 + 16 for 240 s, run `role-split-mixed-audio.yaml` and
+  `role-split-mixed-embed.yaml` unchanged, each process's streams in its own
+  `GUIDELLM__SPEC__PROFILE__STREAMS`.
 
 ## Role-split's cells
 
