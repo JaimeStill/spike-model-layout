@@ -525,6 +525,8 @@ slices 1/5 committed · standards — · spec — · editor —
 - vllm-layout (BUILD, escalation 3): the architect answered: (1) measure audio 4 alone on the Framework, then audio 4 + embedding at a constant 8.4 req/s (the floor) and 34 req/s (4x), 240 s each, before choosing; (2) if audio holds at the realistic rate, the layout is gb10-1 agent, gb10-2 vision, the Framework audio + embedding with embedding rate-limited by the gateway, and a stress cell (audio 8 + embedding at that rate) sets audio's cap; (3) if audio misses even at the floor's rate, run embedding at a steady rate beside vision on gb10-2 and beside the agent at 4 on gb10-1, then stop for the architect. The architect expects a tradeoff with three machines and judges agent and vision the purposes that need the most concurrency and compute, audio and embedding the ones to tune.
 - vllm-layout (BUILD): the Framework's engines update removed the `-rocm72` fallback image's tag (layers kept under the audio image; `docker pull` restores it); a new pending desktop update (gliff 0.4.3-1) is left for the architect.
 
+- vllm-layout (BUILD): the architect ranks gb10-2 vision + embedding (the Framework audio alone) as the absolute fallback, taken only if no tuning lets audio and embedding share the Framework; if it is needed, vision runs at 8 streams beside embedding at steady rates (8.4 and 34 req/s). This replaces escalation 3's answer 3: a miss at the floor's rate leads first to Framework tuning options for the architect, not to GB10 cells.
+
 ## Pending edits
 
 - coordinator · ai-hosting.md "Hosts and access": the drop-caches rule on both GB10s.
