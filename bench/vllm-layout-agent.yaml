@@ -1,0 +1,28 @@
+# vllm-layout's gb10-1 cells (Behavior 5): gpt-oss-120b on the chosen agent row, the FP8 KV row
+# gpt-oss-120b-agent-fp8 (max-num-seqs 12), at the agent's target of 4 sessions and at the row's
+# cap of 12, 110 s a level, two benchmarks in one run, one JSON, read with bench/levels.jq against
+# the agent floor (ITL median <=100 ms). The sessions are role-split's S-agent sessions
+# (role-split-agent-split.yaml), unchanged: GuideLLM's multi-turn synthetic conversation, 4 turns,
+# the first 8,192 prompt tokens and the next three 512 each, every turn exactly 512 output tokens,
+# each turn sent when the last one's reply ends (no think time). A concurrent sweep at the two
+# levels rather than S-agent's knee profile, since two levels give no knee. Engine-neutral: the
+# model and its tokenizer (openai/gpt-oss-120b both) are given on the command line, as `cell`'s
+# <section> <tokenizer>, the JSON's path by `cell`, and the target in
+# GUIDELLM__SPEC__BACKEND__TARGET. Run from the repository root.
+spec:
+  backend:
+    kind: openai_http
+    request_format: /v1/chat/completions
+  profile:
+    kind: concurrent
+    streams: [4, 12]
+  data:
+    - kind: synthetic_text
+      turns: 4
+      first_prompt_tokens: 8192
+      prompt_tokens: 512
+      output_tokens: 512
+  # Each level stops at 110 s; the sessions in flight then are counted incomplete.
+  constraints:
+    - kind: max_duration
+      seconds: 110

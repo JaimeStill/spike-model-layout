@@ -19,6 +19,12 @@ the target in `GUIDELLM__SPEC__BACKEND__TARGET`. Each file's header gives its lo
   engines, on vLLM with the helpers sourced for each row's port and the row's served model
   (the capability-vllm finding,
   [`docs/findings/capability-vllm.md`](../docs/findings/capability-vllm.md)).
+- `vllm-layout-agent.yaml`: the vllm-layout task's gb10-1 cells on the chosen agent row (FP8 KV,
+  max-num-seqs 12): S-agent's 4-turn sessions at the target of 4 and the row's cap of 12, a
+  concurrent sweep, 110 s a level, read with `levels.jq --arg purpose agent`:
+  `cell vllm-layout-fp8-agent vllm-layout-agent openai/gpt-oss-120b openai/gpt-oss-120b`, the
+  helpers sourced for port 8000. The task's accuracy runs (lm-evaluation-harness) are read with
+  `paired.awk`, below.
 
 ## Role-split's cells
 
@@ -165,4 +171,26 @@ the time from the previous request's release to the next proxy line. [`stats.awk
 
 ```sh
 awk -v port=<port> -f bench/srvtimes.awk <log> | sort -k1,1n -k3,3g | awk -f bench/stats.awk
+```
+
+## The paired accuracy test: `paired.awk`
+
+The vllm-layout task runs lm-evaluation-harness 0.4.13 on gb10-1's two agent rows, BF16 then FP8
+KV, with the same flags and seeds, and keeps every question's result (`--log_samples`).
+[`paired.awk`](paired.awk) pairs the two runs of one task on `doc_id`, checks that each pair asked
+the same prompt (`prompt_hash`), and prints each run's accuracy, the discordant pairs b (right on
+BF16, wrong on FP8) and c (the reverse), and McNemar's exact two-sided p-value. FP8's loss is
+significant at 95% when p < 0.05 and b > c. jq cuts each samples file into `doc_id`,
+`prompt_hash` and score; for GPQA the score is `flexible-extract`'s `exact_match`, and for RULER
+the length's key:
+
+```sh
+cut='select(.filter == "flexible-extract") | [.doc_id, .prompt_hash, .exact_match] | @tsv'
+awk -f bench/paired.awk \
+  <(jq -r "$cut" .state/vllm-layout/lm-eval/bf16-gpqa/openai__gpt-oss-120b/samples_*.jsonl) \
+  <(jq -r "$cut" .state/vllm-layout/lm-eval/fp8-gpqa/openai__gpt-oss-120b/samples_*.jsonl)
+cut='[.doc_id, .prompt_hash, .["32768"]] | @tsv'
+awk -f bench/paired.awk \
+  <(jq -r "$cut" .state/vllm-layout/lm-eval/bf16-niah-32768/openai__gpt-oss-120b/samples_*.jsonl) \
+  <(jq -r "$cut" .state/vllm-layout/lm-eval/fp8-niah-32768/openai__gpt-oss-120b/samples_*.jsonl)
 ```
