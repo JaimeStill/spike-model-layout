@@ -45,9 +45,10 @@ N.1; vllm-layout, E.6, F.3). So the layout gives each heavy purpose a GPU of its
   (vllm-layout, C.4), so FP8 is the row. The test can't exclude a loss of up to about 10 points
   on GPQA (C.5).
 - **gb10-2, vision alone.** Beside vision, audio missed its floor at every pair level from 2 + 2
-  to 8 + 8 streams (RTFx 2.86 to 3.36) while vision met its own; alone, vision holds 16 (vllm-layout,
-  E.3 to E.6). NVIDIA's NVFP4 checkpoint showed no significant loss against Google's BF16 on
-  mmmu_val (0.6111 against 0.6178, p 0.68), CUDA against ROCm a limit (G).
+  to 8 + 8 streams (RTFx 2.86 to 3.36) while vision met its own at every pair but 8 + 8; alone,
+  vision holds 16 (vllm-layout, E.3 to E.6). NVIDIA's NVFP4 checkpoint showed no significant loss
+  against Google's BF16 on mmmu_val (0.6111 against 0.6178, p 0.68), CUDA against ROCm a limit
+  (G).
 - **The Framework, audio and embedding.** Audio missed beside embedding run flat out at 16
   streams (RTFx 2.44) and held beside it at a steady 8.4 and 34 requests a second (6.43, 5.84), so
   the gateway rate-limits embedding to 34; at 8 streams beside that rate audio missed by 0.06, so

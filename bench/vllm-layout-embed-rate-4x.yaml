@@ -1,13 +1,13 @@
 # vllm-layout's Framework placement cells after escalation 3, the embedding process: one of two
-# GuideLLM processes started together (the other role-split-mixed-audio.yaml at 4 streams, and at 8
-# in the stress cell that sets the audio row's cap; the standing-layout cell runs it beside
-# all three hosts' targets, the rate the gateway admits), the
-# Framework's granite row (granite-embedding-english-r2-framework) at a constant 34 requests a
-# second for 240 s, under the 10 min cap: 4x the floor: 34 x 512 = 17,408 prompt tok/s, so the cell asks
-# whether audio holds beside an embedding load at that rate, where the concurrent cells drove
-# granite as fast as it answered. Each request is F-embed's (role-split-embed.yaml): 512 synthetic
-# tokens to /v1/embeddings. GuideLLM's constant profile sends at the rate whatever the replies'
-# latency, so the requests in flight follow the server. Engine-neutral: the model and its tokenizer
+# GuideLLM processes started together (the other role-split-mixed-audio.yaml at 4 streams, and at
+# 8 in the stress cell that sets the audio row's cap; the standing-layout cell runs it beside all
+# three hosts' targets, the rate the gateway admits), the Framework's granite row
+# (granite-embedding-english-r2-framework) at a constant 34 requests a second for 240 s, under the
+# 10 min cap. That is 4x the floor, 34 x 512 = 17,408 prompt tok/s, so the cell asks whether audio
+# holds beside an embedding load at that rate, where the concurrent cells drove granite as fast as
+# it answered. Each request is F-embed's (role-split-embed.yaml): 512 synthetic tokens to
+# /v1/embeddings. GuideLLM's constant profile sends at the rate whatever the replies' latency, so
+# the requests in flight follow the server. Engine-neutral: the model and its tokenizer
 # (ibm-granite/granite-embedding-english-r2) are given on the command line, as `cell`'s <section>
 # <tokenizer>, the JSON's path by `cell`, and the target in GUIDELLM__SPEC__BACKEND__TARGET. Run
 # from the repository root.

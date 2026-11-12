@@ -195,10 +195,11 @@ and load targets are agreed in its task's own plan round.
    the FP8-against-BF16 accuracy check as the task's one new tool. The measurements moved the
    placement: audio missed beside vision on gb10-2 and held beside rate-limited embedding on the
    Framework, so the hosts end on gb10-1 the agent, gb10-2 vision, and the Framework audio and
-   embedding, with no failover and llama.cpp removed from the workstations. Then the answer: `docs/layout.md` finalized, the routing and model-management
-   requirements for spike-model-gateway, README "The answer", and the answer section in
-   `ai-hosting.md` (evidence 7, 9). It may take up to five slices, the last a walkthrough: the
-   one exception to the rules' four.
+   embedding, with no failover and llama.cpp removed from the workstations. Then the answer:
+   `docs/layout.md` finalized, the routing and model-management requirements for
+   spike-model-gateway, README "The answer", and the answer section in `ai-hosting.md` (evidence
+   7, 9). It may take up to five slices, the last a walkthrough: the one exception to the rules'
+   four.
 
 ## References
 
