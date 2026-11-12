@@ -12,9 +12,7 @@
 4. [x] framework
 5. [x] agent-vllm
 6. [x] capability-vllm
-7. [ ] on-demand
-8. [ ] two-node
-9. [ ] answer
+7. [ ] vllm-layout
 
 ## Task brief · capability-vllm
 
@@ -499,6 +497,14 @@ Door          two-way: the rows, suite changes and audio image revert by
 - capability-vllm (BUILD): after the reviews, gb10-2's and the Framework's clones moved to bb68cbd, a comment-only change; every figure was measured at 4ad76e6.
 - capability-vllm (BUILD): the Framework's system memory came closest to its floor during the vLLM vision sweep, 0.76 GiB above 12.5 GiB, under the 0.60, 0.18 and 0.03 fractions. It is reported as found; nothing was rerun or changed.
 - capability-vllm (accept): queueing the capability host by GPU compute pressure, not free memory, is the gateway's: admit on the engines' live latency and queue signals against each purpose's floor (vLLM and llama.cpp `/metrics`), since gb10-2's mixed cell missed vision with ~19 GiB free above its floor; carried to the answer task's routing requirements for spike-model-gateway (the architect).
+- plan: on-demand is dropped: the capabilities are designated and their memory layouts essentially optimized; GPU compute, not memory, is the bottleneck; and loading and unloading add compute on top of inference (the architect, 2026-11-12).
+- plan: two-node is dropped: vLLM instances, one model each, spread across gb10-1 and gb10-2 replace pooling the GB10s for the agent, with the Framework as backup compute; one final task, vllm-layout, replaces on-demand and two-node and absorbs answer (the architect, 2026-11-12).
+- plan: vLLM is the preferred engine, for concurrency first, and manages model loads better; vllm-layout removes llama.cpp from the workstations and leaves the hosts on the vLLM layout as their standing state; spike-model-engines keeps its llama.cpp features (the architect, 2026-11-12).
+- plan: model management stays off the serving API, since a user client such as Pi changing a workstation's model configuration through llama.cpp's server API is a vulnerability; the gateway as the single secure point of model management for the vLLM instances is welcome, and spike-model-gateway's roadmap entry carries it as a comment (the architect, 2026-11-12).
+- plan: vllm-layout tunes the capability pool's concurrent sessions across vision, audio and embedding together, with a strategy that keeps them from competing for compute; rejected: an isolation cell (the architect, 2026-11-12).
+- plan: the FP8 KV against BF16 accuracy check is vllm-layout's one new tool; a lever that needs another tool, such as CUDA MPS, competes for that slot in its plan round (the architect, 2026-11-12).
+- plan: vllm-layout identifies a lighter Gemma 4 vision model for the Framework that its vLLM ROCm engine serves within the quantization floor and the model-origin rule, and measures it against the BF16 26B-A4B row at the vision floor (the architect, 2026-11-12).
+- plan: vllm-layout may take up to five slices, the last a walkthrough, an exception to the experiment's four that its brief states; v0.34's source and the next brief are left to its own rounds (the architect, 2026-11-12).
 
 ## Pending edits
 
@@ -523,5 +529,5 @@ Door          two-way: the rows, suite changes and audio image revert by
 - spike-model-engines · intake note (housekeeping): agent-vllm's pull request to host/ carries llama.env's hold note through b12271, which supersedes the b12211 -> b12242 note above; drop that note once the pull request merges.
 - coordinator · intake note (ai-hosting.md, experiment.hosting): for the agent, the architect accepts a longer cold start in exchange for better concurrency and overall performance, and finds vLLM the more attractive agent engine, chiefly for its concurrency (spike-model-layout `docs/findings/agent-vllm.md`, the conclusion and N).
 - spike-model-engines · intake note: `docs/engines/vllm/models.md` and `docs/engines/vllm/api.md` (outside host/) still describe v0.32.0 and list neither the `gpt-oss-120b-agent` nor the `gpt-oss-120b-agent-fp8` row (spike-model-layout `docs/findings/agent-vllm.md`, N).
-- coordinator · intake note (ai-hosting.md, experiment.hosting): gpt-oss-120b's FP8 KV cache on vLLM runs uncalibrated at scale 1.0, and an accuracy check of the FP8 row against the BF16 row would settle the agent row. That check is a new tool, so it belongs to a future task's plan round (spike-model-layout `docs/findings/agent-vllm.md`, E, N).
+- coordinator · intake note (ai-hosting.md, experiment.hosting): gpt-oss-120b's FP8 KV cache on vLLM runs uncalibrated at scale 1.0, and an accuracy check of the FP8 row against the BF16 row would settle the agent row. That check is vllm-layout's one new tool (spike-model-layout `docs/findings/agent-vllm.md`, E, N).
 - spike-model-engines · intake note: the vLLM guides in `docs/engines/vllm/` (README.md, setup.md, models.md, api.md, update.md, uninstall.md; outside host/) still describe one `vllm` container on port 8000. They don't cover a row's own container, port and image (capability-vllm's host/ change, 4ad76e6), `VLLM_ROCM_BUILD` and the `-rocm72` fallback, building the Framework's audio image, or the Framework's ufw route rules for ports 8001 and 8002, and they list none of the six capability rows (spike-model-layout `docs/findings/capability-vllm.md`, A.2, A.3, N).

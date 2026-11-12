@@ -1,11 +1,12 @@
 # spike-model-layout
 
 spike-model-layout is where the workstations' three memory pools get their layout: which models
-gb10-1, gb10-2 and the Framework each serve, at what context, for how many concurrent sessions,
-and which load on demand rather than stay resident. It measures each placement with GuideLLM in
-capped runs on all three hosts, weighs a full set on one GB10 against splitting the roles across
-both GB10s, measures one model served across both GB10s over QSFP, and gives the layout
-v1.ai.hosting specifies as evidence. The spike decides nothing itself.
+gb10-1, gb10-2 and the Framework each serve, at what context, and for how many concurrent
+sessions. It measures each placement with GuideLLM in capped runs on all three hosts, weighs a
+full set on one GB10 against splitting the roles across both GB10s, compares vLLM with llama.cpp,
+and tunes the layout the architect chose: vLLM instances, one model each, across gb10-1 and
+gb10-2, with the Framework as backup compute. It gives the layout v1.ai.hosting specifies as
+evidence. The spike decides nothing itself.
 
 The spike is the sub-goal `experiment.hosting.spike-model-layout` in the coordinator's roadmap,
 `standards-lab/context/roadmap.toml`, where its tasks live. Its question is framed in
@@ -42,15 +43,18 @@ and what context and how many concurrent sessions does each placed model hold?
    gpu-memory-utilization 0.80; FP8 KV at fixed bytes sized for 1,179,648 tokens), against
    llama.cpp's agent-only section on one GB10, in one session, at the agent's load target: speed,
    TTFT under multi-turn load, memory, and cold start.
-7. On demand against resident: each model's cold load and first-request latency through
-   llama.cpp's router, against the memory it frees, and which purposes can load on demand.
-8. Two-node serving over QSFP: gpt-oss-120b across both GB10s (vLLM with Ray, in containers)
-   against one node, in one session; it weighs the candidate layout of both GB10s pooled for the
-   agent with the Framework serving the capability models.
+7. The vLLM layout tuned: the agent row's KV dtype settled by an FP8-against-BF16 accuracy check;
+   the capability pool's concurrency tuned across vision, audio and embedding together, with a
+   strategy that keeps them from competing for compute; a lighter Gemma 4 vision model for the
+   Framework's vLLM ROCm engine; v0.34 against v0.33.0; and the standing layout at the load
+   targets.
+8. Not pursued: two-node serving over QSFP. One model per instance across the GB10s replaces
+   pooling them (the architect, 2026-11-12).
 9. The layout: per host, its purposes, models, context, slots and load targets; what it needs from
-   routing (session stickiness, overflow) as requirements for spike-model-gateway; and the host
-   descriptors' purposes and load targets as requirements for the intake. Our own agents and role
-   sets under our own sessions stay with model-evaluation.
+   routing (session stickiness, overflow) and model management as requirements for
+   spike-model-gateway; the host descriptors' purposes and load targets as requirements for the
+   intake; and the items not pursued, on-demand loading and two-node serving, with their reasons.
+   Our own agents and role sets under our own sessions stay with model-evaluation.
 
 ## Rules
 
@@ -94,8 +98,10 @@ The experiment's rules, in `ai-hosting.md`, govern every session. In short:
 - **The vLLM capability comparison** against llama.cpp on gb10-2 and the Framework: vision, audio
   and embedding, each in its own process,
   [`docs/findings/capability-vllm.md`](../docs/findings/capability-vllm.md).
-- **On-demand serving** through llama.cpp's router.
-- **Two-node serving** over QSFP with vLLM and Ray.
+- **On-demand serving** through llama.cpp's router: not pursued, since GPU compute, not memory, is
+  the bottleneck (the architect, 2026-11-12).
+- **Two-node serving** over QSFP with vLLM and Ray: not pursued, since one model per vLLM instance
+  across the GB10s replaces pooling them (the architect, 2026-11-12).
 - **The layout document:** [`docs/layout.md`](../docs/layout.md), living, finalized by the answer.
 - **The step helpers:** `scripts/measure-lib.sh`, adapted from spike-hosting-upgrades' without its
   tier and conform helpers, sourced and called one step at a time, logging every command to this
@@ -136,12 +142,13 @@ and load targets are agreed in its task's own plan round.
    Framework (vLLM ROCm), against llama.cpp's sections rerun in the same session; a pull request
    to spike-model-engines' `host/` first gives each row its own container, port and memory fraction
    (evidence 3, 5, beside 6).
-7. `on-demand`: llama.cpp's router loading models on demand against keeping them resident, on
-   each host (evidence 7).
-8. `two-node`: gpt-oss-120b across both GB10s over QSFP with vLLM and Ray, against one node; Ray
-   is the task's one new tool (evidence 8).
-9. `answer`: `docs/layout.md` finalized, the routing requirements for spike-model-gateway, README
-   "The answer", and the answer section in `ai-hosting.md` (evidence 9).
+7. `vllm-layout`: vLLM instances, one model each, across gb10-1 and gb10-2, with the Framework as
+   backup compute, tuned and measured at the load targets, with the FP8-against-BF16 accuracy
+   check as the task's one new tool; the hosts end on that layout, with llama.cpp removed from the
+   workstations. Then the answer: `docs/layout.md` finalized, the routing and model-management
+   requirements for spike-model-gateway, README "The answer", and the answer section in
+   `ai-hosting.md` (evidence 7, 9). It may take up to five slices, the last a walkthrough: the
+   one exception to the rules' four.
 
 ## References
 
