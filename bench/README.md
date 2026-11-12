@@ -32,9 +32,13 @@ the target in `GUIDELLM__SPEC__BACKEND__TARGET`. Each file's header gives its lo
   `cell vllm-layout-g2-vision-4 vllm-layout-vision-alone nvidia/Gemma-4-26B-A4B-NVFP4 google/gemma-4-26B-A4B-it`,
   the helpers sourced for port 8000, and `cell vllm-layout-g2-audio-4 vllm-layout-audio-alone
   google/gemma-4-E4B-it google/gemma-4-E4B-it` for port 8001. Its pair cells, the two rows
-  together at 4 + 4 and 8 + 8 for 240 s, run `role-split-mixed-vision.yaml` and
-  `role-split-mixed-audio.yaml` unchanged, their streams in `GUIDELLM__SPEC__PROFILE__STREAMS`
-  (below).
+  together for 240 s at vision + audio 4 + 4, 8 + 8, 4 + 2, 2 + 2 and 2 + 4, run
+  `role-split-mixed-vision.yaml` and `role-split-mixed-audio.yaml` unchanged, each process's
+  streams in its own `GUIDELLM__SPEC__PROFILE__STREAMS` (below).
+- `vllm-layout-vision-capacity.yaml`: the same task's gb10-2 vision row alone at 8 and then 16
+  streams, 90 s a level, the vision-alone requests unchanged: gb10-2's vision-only capacity,
+  `cell vllm-layout-g2-vision-capacity vllm-layout-vision-capacity nvidia/Gemma-4-26B-A4B-NVFP4
+  google/gemma-4-26B-A4B-it`, the helpers sourced for port 8000.
 
 ## Role-split's cells
 
