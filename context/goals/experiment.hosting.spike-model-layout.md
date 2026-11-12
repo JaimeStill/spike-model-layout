@@ -529,6 +529,9 @@ slices 1/5 committed · standards — · spec — · editor —
 
 - vllm-layout (BUILD): audio held beside steady-rate embedding on the Framework: alone RTFx 6.54; beside 8.4 req/s 6.43 (embedding 4,309 tok/s); beside 34 req/s 5.84 (17,442 tok/s); embedding latency 0.02 s. By escalation 3's answer 2 the layout is gb10-1 agent, gb10-2 vision, the Framework audio + embedding, embedding rate-limited by the gateway; 34 req/s (4x the floor) is the measured rate audio tolerates and the stress cell's rate. levels.jq prints `rate <r>` for a constant-rate level.
 
+- vllm-layout (BUILD): the Framework stress cell, audio 8 + embedding at 34 req/s, missed audio by 0.06 (RTFx 4.94, 406/876 >= 5; embedding met, 17,442 tok/s), so audio's cap is 4; host/ 8f981ee removes gb10-2's audio row, the Framework's 12B and BF16 rows, and caps the Framework's audio at 4.
+- vllm-layout (BUILD, escalation 4): the BF16 26B-A4B mmmu_val reference hit its 45 min cap at 869/900 (lm-eval saves only at the end; nothing kept). The architect answered: rerun it once with a 60 min cap and identical settings, then the paired test against NVFP4, the BF16 weights removed, and host/ delivered.
+
 ## Pending edits
 
 - coordinator · ai-hosting.md "Hosts and access": the drop-caches rule on both GB10s.
