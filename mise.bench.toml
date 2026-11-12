@@ -1,6 +1,7 @@
-# The load tool the spike measures with from the laptop, GuideLLM, and the runtimes it needs. It
-# lives in its own environment, not mise.toml, so `mise run check` never installs it. Activate it
-# with MISE_ENV=bench: `MISE_ENV=bench mise install`, then `MISE_ENV=bench mise exec -- guidellm`.
+# The tools the spike measures with from the laptop, GuideLLM for load and lm-evaluation-harness
+# for accuracy, and the runtimes they need. They live in their own environment, not mise.toml, so
+# `mise run check` never installs them. Activate it with MISE_ENV=bench: `MISE_ENV=bench mise
+# install`, then `MISE_ENV=bench mise exec -- guidellm` or `MISE_ENV=bench mise exec -- lm_eval`.
 [tools]
 # Held on 3.14: torchcodec 0.17.0, which GuideLLM 0.8.1's audio extra needs, publishes no wheel or
 # sdist for Python 3.15 (cp315) yet, so currency reports Python behind its latest, 3.15.2, until it
@@ -10,3 +11,9 @@ python = "3.14.10"
 # vision cells' image requests and the audio-chat cells' audio requests need.
 uv = "0.13.7"
 "pipx:guidellm" = { version = "0.8.1", extras = ["vision", "audio"] }
+# The accuracy check, vllm-layout's one new tool: lm-evaluation-harness, run as `lm_eval` against a
+# host's OpenAI API (local-chat-completions), through uv as GuideLLM is. Its api extra carries the
+# API models' client; its ruler extra RULER's haystack generators (nltk, wonderwords, scipy).
+# uvx_args adds what no extra carries: transformers, which loads the tokenizer RULER sizes its
+# haystacks with and the API models count tokens with, and Pillow, which mmmu's images need.
+"pipx:lm-eval" = { version = "0.4.13", extras = ["api", "ruler"], uvx_args = "--with transformers --with pillow" }
