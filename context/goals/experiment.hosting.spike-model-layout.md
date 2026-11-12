@@ -1,8 +1,8 @@
 # goal · experiment.hosting.spike-model-layout
 
-- **State:** brief ready
-- **Task:** vllm-layout
-- **Branch:** vllm-layout
+- **State:** idle
+- **Task:** none
+- **Branch:** none
 
 ## Tasks
 
@@ -12,7 +12,7 @@
 4. [x] framework
 5. [x] agent-vllm
 6. [x] capability-vllm
-7. [ ] vllm-layout
+7. [x] vllm-layout
 
 ## Task brief · vllm-layout
 
@@ -261,10 +261,6 @@ Door          two-way: rows, pins and suite changes revert by a commit
               commands). Reboots change no state. Nothing in the task
               can't be undone.
 ```
-
-## Progress
-
-slices 5/5 committed (5 waived) · standards — · spec — · editor —
 
 ## Decisions
 
@@ -550,6 +546,8 @@ slices 5/5 committed (5 waived) · standards — · spec — · editor —
 - vllm-layout (BUILD): host/ 90ef16f, the pull request's head, changes comments only on top of 8f981ee (the section comment's vision floor "at every pair but 8 + 8", the audio comment rewrapped); the hosts stay on 8f981ee, where every figure was measured, as capability-vllm's bb68cbd did.
 - vllm-layout (BUILD): currency reports uv 0.13.7 behind 0.13.8 in the bench environment; the move is left to the next currency step; an intake note.
 - vllm-layout (BUILD): `bench/levels.jq`'s `client` mode stops with a jq error on an embedding result (`vllm-layout-fw-embed-sweep.json`: a null first-chunk time, since embedding requests don't stream); left as found, an intake note.
+
+- vllm-layout: the architect accepted the session brief, authorizing publish, merge, the hosts' clones to main, the sync, and staging spike-model-gateway.
 
 ## Pending edits
 
