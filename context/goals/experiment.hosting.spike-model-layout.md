@@ -535,6 +535,9 @@ slices 2/5 committed · standards — · spec — · editor —
 - vllm-layout (BUILD): the BF16 26B-A4B reference finished in 46:24 under the 60 min cap: mmmu_val 0.6178 against NVFP4's 0.6111 (b 78, c 72, p 0.68; 0 prompt mismatches), so NVFP4's loss is not significant (CUDA against ROCm recorded as a limit); the BF16 weights (51.6G) are removed.
 - vllm-layout (BUILD): host/ 8f981ee is delivered to gb10-2 (vision alone, 16, 0.40; idle 65.72 GiB) and the Framework (granite 128, 0.03; audio 4, 0.18; idle GTT 89.50, system 88.02 GiB); gb10-1 stays on 3efb444, whose rows 8f981ee keeps.
 
+- vllm-layout (BUILD): gb10-1 and the Framework already set net.ipv4.ip_nonlocal_bind = 1 persistently (gb10-1 90-nonlocal-bind.conf, Oct 30; the Framework 60-tailnet-bind.conf, Nov 2), so Behavior 11's sysctl step changes nothing; the Framework's file keeps its name (the architect). llama.cpp is removed from all three hosts (container, images, four GGUF repos, 81.87 GiB of store each); every standing container is unless-stopped. gb10-1 runs 8f981ee without a restart (its row unchanged).
+- vllm-layout (BUILD): gb10-2's E4B and granite safetensors, which no gb10-2 row serves, are removed (the architect). The Framework's df did not drop after the GGUF removal; btrfs snapshots likely hold the blocks; the architect cleans them up by hand.
+
 ## Pending edits
 
 - coordinator · ai-hosting.md "Hosts and access": the drop-caches rule on both GB10s.
