@@ -1,6 +1,6 @@
 # goal · experiment.hosting.spike-model-layout
 
-- **State:** building
+- **State:** brief ready
 - **Task:** vllm-layout
 - **Branch:** vllm-layout
 
