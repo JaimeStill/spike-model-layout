@@ -3,8 +3,8 @@
 #   jq -r --arg purpose <agent|vision|audio|embed> -f bench/levels.jq <result.json>...
 #   jq -r --arg purpose client [--argjson level <i>] -f bench/levels.jq <result.json>...
 #
-# A purpose prints the knee GuideLLM concluded, then one row a level: streams, requests ok /
-# errored / incomplete, output tok/s, requests/s, TTFT median, ITL median and p95 (GuideLLM's
+# A purpose prints the knee GuideLLM concluded, then one row a level: streams (or "rate <r>" on a
+# constant-rate level), requests ok / errored / incomplete, output tok/s, requests/s, TTFT median, ITL median and p95 (GuideLLM's
 # own), request latency median, p90 and min, for vision the count at latency <=10 s, prompt tok/s,
 # RTFx median and min and the count at RTFx >=5, the level's duration, and its floor verdict. The
 # two counts are "met/successful", the per-request reading of the floor beside its median verdict.
@@ -62,7 +62,7 @@ def level($purpose):
      elif $purpose == "vision" then ($lat | length) > 0 and $latm <= 10
      elif $purpose == "audio" then ($rtfx | length) > 0 and ($rtfx | median) >= 5
      else $ptps >= 4300 end) and $rt.successful > 0) as $ok
-  | [ (.config.strategy.streams | tostring),
+  | [ (.config.strategy.streams // "rate \(.config.strategy.rate)" | tostring),
       "\($rt.successful)/\($rt.errored)/\($rt.incomplete)",
       ($m.output_tokens_per_second.successful.mean | fixed(2)),
       ($m.requests_per_second.successful.mean | fixed(3)),

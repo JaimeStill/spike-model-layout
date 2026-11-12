@@ -48,6 +48,13 @@ the target in `GUIDELLM__SPEC__BACKEND__TARGET`. Each file's header gives its lo
   cells, audio + embedding 4 + 16 and 8 + 16 for 240 s, run `role-split-mixed-audio.yaml` and
   `role-split-mixed-embed.yaml` unchanged, each process's streams in its own
   `GUIDELLM__SPEC__PROFILE__STREAMS`.
+- `vllm-layout-embed-rate-floor.yaml`, `vllm-layout-embed-rate-4x.yaml`: the same task's Framework
+  embedding process at a constant 8.4 and 34 requests a second for 240 s (F-embed's 512-token
+  requests: the floor of 4,300 prompt tok/s, and four times it), beside audio at 4 streams
+  (`role-split-mixed-audio.yaml`, `GUIDELLM__SPEC__PROFILE__STREAMS=4`) started with it:
+  `cell vllm-layout-fw-pair-a4r8-embed vllm-layout-embed-rate-floor
+  ibm-granite/granite-embedding-english-r2 ibm-granite/granite-embedding-english-r2`, the helpers
+  sourced for port 8002. `levels.jq` labels such a level "rate <r>".
 
 ## Role-split's cells
 
