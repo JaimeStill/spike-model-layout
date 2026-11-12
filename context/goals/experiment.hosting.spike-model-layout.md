@@ -538,6 +538,8 @@ slices 2/5 committed · standards — · spec — · editor —
 - vllm-layout (BUILD): gb10-1 and the Framework already set net.ipv4.ip_nonlocal_bind = 1 persistently (gb10-1 90-nonlocal-bind.conf, Oct 30; the Framework 60-tailnet-bind.conf, Nov 2), so Behavior 11's sysctl step changes nothing; the Framework's file keeps its name (the architect). llama.cpp is removed from all three hosts (container, images, four GGUF repos, 81.87 GiB of store each); every standing container is unless-stopped. gb10-1 runs 8f981ee without a restart (its row unchanged).
 - vllm-layout (BUILD): gb10-2's E4B and granite safetensors, which no gb10-2 row serves, are removed (the architect). The Framework's df did not drop after the GGUF removal; btrfs snapshots likely hold the blocks; the architect leaves the snapshots as they are; recorded as an intake note.
 
+- vllm-layout (BUILD): the Framework's root is LUKS-encrypted; its reboot needed the architect's passphrase at the console, so it does not return unattended (Behavior 11 holds for the GB10s only) and its timeline includes the passphrase. Unlocking without a person (TPM2 enrollment, a keyfile) is a security decision outside the task; recorded as an intake note.
+
 ## Pending edits
 
 - coordinator · ai-hosting.md "Hosts and access": the drop-caches rule on both GB10s.
