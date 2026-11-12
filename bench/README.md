@@ -54,7 +54,11 @@ the target in `GUIDELLM__SPEC__BACKEND__TARGET`. Each file's header gives its lo
   (`role-split-mixed-audio.yaml`, `GUIDELLM__SPEC__PROFILE__STREAMS=4`) started with it:
   `cell vllm-layout-fw-pair-a4r8-embed vllm-layout-embed-rate-floor
   ibm-granite/granite-embedding-english-r2 ibm-granite/granite-embedding-english-r2`, the helpers
-  sourced for port 8002. `levels.jq` labels such a level "rate <r>".
+  sourced for port 8002. `levels.jq` labels such a level "rate <r>". The 4x file is also the
+  stress cell's embedding process, beside audio at 8 streams (`GUIDELLM__SPEC__PROFILE__STREAMS=8`;
+  at 8 the audio file's 876 rows can run out before 240 s, and its JSON's duration says when):
+  `cell vllm-layout-fw-stress-a8r34-embed vllm-layout-embed-rate-4x ...`, which sets the
+  Framework audio row's cap.
 
 ## Role-split's cells
 
@@ -223,4 +227,16 @@ cut='[.doc_id, .prompt_hash, .["32768"]] | @tsv'
 awk -f bench/paired.awk \
   <(jq -r "$cut" .state/vllm-layout/lm-eval/bf16-niah-32768/openai__gpt-oss-120b/samples_*.jsonl) \
   <(jq -r "$cut" .state/vllm-layout/lm-eval/fp8-niah-32768/openai__gpt-oss-120b/samples_*.jsonl)
+```
+
+The same task's vision check pairs mmmu_val's 900 questions, NVFP4 on gb10-2 against Google's
+BF16 26B-A4B on the Framework, with the same flags and seeds but the endpoint and model. Its
+samples come one file a subject, 30 of them, and `doc_id` restarts at 0 in each, so the cut keys
+each question by its own id (`doc.id`, e.g. `validation_Accounting_1`) and reads its `acc`:
+
+```sh
+cut='[.doc.id, .prompt_hash, .acc] | @tsv'
+awk -f bench/paired.awk \
+  <(jq -r "$cut" .state/vllm-layout/lm-eval/bf16-mmmu/google__gemma-4-26B-A4B-it/samples_*.jsonl) \
+  <(jq -r "$cut" .state/vllm-layout/lm-eval/nvfp4-mmmu/nvidia__Gemma-4-26B-A4B-NVFP4/samples_*.jsonl)
 ```

@@ -1,15 +1,19 @@
 # The paired test between two runs of one lm-evaluation-harness task, question by question: the
-# vllm-layout task's BF16 and FP8 agent rows. Each run is given as "<doc_id> <tab> <prompt_hash>
-# <tab> <score>" lines, one a question, which jq cuts from the run's samples file; the first file
-# is the reference (BF16), the second the candidate (FP8):
+# vllm-layout task's BF16 and FP8 agent rows, and its vision rows, NVFP4 against the BF16
+# reference. Each run is given as "<id> <tab> <prompt_hash> <tab> <score>" lines, one a question,
+# which jq cuts from the run's samples files; the first file is the reference (BF16), the second
+# the candidate (FP8, NVFP4):
 #
 #   awk -f bench/paired.awk <(jq -r '<cut>' <reference samples>) <(jq -r '<cut>' <candidate samples>)
 #
 # with, for GPQA, `select(.filter == "flexible-extract") | [.doc_id, .prompt_hash, .exact_match]
-# | @tsv`, and for RULER at a length, `[.doc_id, .prompt_hash, .["32768"]] | @tsv` (the length's
-# key). A score is 1 (right) or 0 (wrong); any other value is counted apart and left out.
+# | @tsv`, for RULER at a length, `[.doc_id, .prompt_hash, .["32768"]] | @tsv` (the length's
+# key), and for mmmu_val, `[.doc.id, .prompt_hash, .acc] | @tsv` over all 30 subject files: its
+# doc_id restarts at 0 in each subject's file, so the question's own id (validation_Accounting_1)
+# keys it. A score is 1 (right) or 0 (wrong), mmmu's 1.0 and 0.0 among them, since awk compares a
+# numeric field as a number; any other value is counted apart and left out.
 #
-# Questions pair on doc_id. A pair whose prompt_hash differs asked the two rows different prompts:
+# Questions pair on the id. A pair whose prompt_hash differs asked the two rows different prompts:
 # each one is printed and counted, and still paired. It prints each run's accuracy over the pairs,
 # b (right on the reference, wrong on the candidate) and c (the reverse), and McNemar's exact
 # two-sided p-value: the binomial probability, at p = 0.5 over the b + c discordant pairs, of a
