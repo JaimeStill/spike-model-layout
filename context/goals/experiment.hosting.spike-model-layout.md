@@ -264,7 +264,7 @@ Door          two-way: rows, pins and suite changes revert by a commit
 
 ## Progress
 
-slices 0/5 committed · standards — · spec — · editor —
+slices 1/5 committed · standards — · spec — · editor —
 
 ## Decisions
 
@@ -507,6 +507,14 @@ slices 0/5 committed · standards — · spec — · editor —
 - vllm-layout: gb10-1 and the Framework set net.ipv4.ip_nonlocal_bind as gb10-2 does (the architect's root step), and each of the three hosts reboots once, timed until its rows serve.
 - vllm-layout: the Framework's GTT ceiling stays 112 GiB through ttm.pages_limit alone; the deprecated amdgpu gttsize option is removed and the boot images rebuilt with limine-mkinitcpio, taken by that reboot; rejected: raising it to 120 GiB, past which the system floor binds first; the 512 MiB carve-out and Hyprland stay (the architect).
 - vllm-layout: the brief takes five slices, the experiment's one exception to four, the last the architect's walkthrough (the architect, 2026-11-12).
+
+- vllm-layout (BUILD): vLLM v0.34.0 was not released at BUILD start (GitHub latest v0.33.0; tags v0.34.0rc0-rc2 only), so every host stays on v0.33.0 and v0.34 goes to the intake as a note.
+- vllm-layout (BUILD): the architect's OS updates moved no kernel, driver, CUDA or Mesa (chrome on all three; nodejs and yt-dlp on the Framework); no reboot taken.
+- vllm-layout (BUILD): the GPQA task is `gpqa_diamond_cot_zeroshot`, the zero-shot generative variant a chat API can run; flexible-extract is the paired test's score, strict-match recorded beside it (0.0 on both rows). RULER runs once per length, `--limit 50` each. lm-eval carries transformers and Pillow through `uvx_args`.
+- vllm-layout (BUILD): the architect's walk (GPQA `--limit 10` on BF16): 10 of 10 answered, 0.8, 82 s; clean readout.
+- vllm-layout (BUILD): FP8 is the agent row: no task's paired loss is significant (GPQA 0.667 vs 0.621, b 24 c 15, p 0.20; RULER 32k 0.88 vs 0.80, p 0.22; 64k 0.90 vs 0.92, p 1); RULER's misses on both rows are the right number printed with spaces or commas.
+- vllm-layout (BUILD): BF16's KV came up at 714,316 tokens this start (agent-vllm 846,411); FP8's at 1,733,910, as agent-vllm. The FP8 cold start dipped under the 12.2 GiB floor during graph capture (11.39 GiB at its lowest, 21 s); not an idle read or a cell, so no stop; recorded for slice 3's reboot.
+- vllm-layout (BUILD): FP8 at 12 sessions meets ITL 100 ms by 0.93 ms (99.07 ms; TTFT 15.9 s); at 4, 49.13 ms. The agent bench file is a concurrent sweep at [4, 12] (bench/vllm-layout-agent.yaml).
 
 ## Pending edits
 
